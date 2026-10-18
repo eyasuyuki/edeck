@@ -39,6 +39,7 @@ class PlayerActivity : Activity() {
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         )
         setContentView(playerView)
+        playerView.setControllerShowTimeoutMs(CONTROLLER_SHOW_TIMEOUT_MS)
         val isSmb = Uri.parse(mediaUri).scheme.equals("smb", ignoreCase = true)
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
@@ -134,6 +135,7 @@ class PlayerActivity : Activity() {
         private const val BUFFER_FOR_PLAYBACK_MS = 3_000
         private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 8_000
         private const val TARGET_BUFFER_BYTES = 96 * 1024 * 1024
+        private const val CONTROLLER_SHOW_TIMEOUT_MS = 2_000
         private const val HTTP_CONNECT_TIMEOUT_MS = 30_000
         private const val HTTP_READ_TIMEOUT_MS = 60_000
         private const val SKIP_INTERVAL_MS = 10_000L
