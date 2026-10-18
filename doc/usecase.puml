@@ -1,0 +1,39 @@
+@startuml
+title Video Player
+left to right direction
+
+actor User
+
+rectangle "Video Player" {
+    usecase "Set up\nvideo source" as UC_Setup
+    usecase "Select video" as UC_Select
+    usecase "Play video" as UC_Play
+    usecase "Build video list\nfrom source" as UC_BuildList
+}
+
+User -- UC_Setup
+User -- UC_Select
+User -- UC_Play
+
+UC_Setup ..> UC_BuildList : <<include>>
+
+note right of UC_BuildList
+* Search the source recursively
+* Find supported video files
+* Sort by date in descending order
+* Display newest videos first
+* Update list automatically
+end note
+
+note right of UC_Play
+Before playback:
+If a saved playback position exists,
+resume from that position.
+
+During/after playback:
+If any part is played,
+mark the video as viewed and
+save the playback position.
+end note
+
+@enduml

@@ -1,0 +1,30 @@
+<resources>
+    <string name="app_name">EDeck</string>
+    <string name="home_description">UPnP/DLNAまたはSMBの共有から動画を読み込みます。</string>
+    <string name="action_search_upnp">UPnP/DLNAを検索</string>
+    <string name="action_open_smb">SMB共有を開く</string>
+    <string name="action_refresh">一覧を更新</string>
+    <string name="status_choose_source">UPnPサーバーを検索するか、SMB共有のアドレスを入力してください</string>
+    <string name="status_searching_upnp">LAN内のUPnP/DLNAサーバーを検索中…</string>
+    <string name="status_no_upnp">UPnP/DLNAサーバーが見つかりません。同じLANに接続しているか確認してください。</string>
+    <string name="status_upnp_found">%1$d 台のサーバーが見つかりました</string>
+    <string name="title_upnp_servers">UPnP/DLNAサーバー</string>
+    <string name="status_searching_server">%1$s を検索中…</string>
+    <string name="cancel">キャンセル</string>
+    <string name="hint_domain">ドメイン（不要なら空欄）</string>
+    <string name="hint_username">ユーザー名（匿名なら空欄）</string>
+    <string name="hint_password">パスワード</string>
+    <string name="title_connect_smb">SMB共有に接続</string>
+    <string name="message_connect_smb">サーバーのアドレスと共有名を入力してください。例: smb://192.168.1.10/Videos</string>
+    <string name="connect">接続</string>
+    <string name="error_smb_address_required">SMBサーバーと共有名を入力してください</string>
+    <string name="status_searching_smb">SMB共有を検索中…</string>
+    <string name="error_load">読み込みに失敗しました: %1$s</string>
+    <string name="network_error">ネットワークエラー</string>
+    <string name="status_no_videos">対応動画が見つかりませんでした</string>
+    <string name="status_videos_found">%1$d 件の動画（更新日時の新しい順）</string>
+    <string name="status_open_source_first">先にUPnPサーバーまたはSMB共有を開いてください</string>
+    <string name="status_refreshing">一覧を更新中…</string>
+    <string name="error_upnp_search">UPnP検索に失敗しました: %1$s</string>
+    <string name="player_title">動画再生</string>
+</resources>

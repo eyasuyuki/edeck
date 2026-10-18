@@ -1,0 +1,30 @@
+<resources>
+    <string name="app_name">EDeck</string>
+    <string name="home_description">Browse videos from UPnP/DLNA or SMB shares.</string>
+    <string name="action_search_upnp">Search UPnP/DLNA</string>
+    <string name="action_open_smb">Open SMB Share</string>
+    <string name="action_refresh">Refresh List</string>
+    <string name="status_choose_source">Search for a UPnP server or enter an SMB share address.</string>
+    <string name="status_searching_upnp">Searching the LAN for UPnP/DLNA servers…</string>
+    <string name="status_no_upnp">No UPnP/DLNA servers found. Check that you are on the same network.</string>
+    <string name="status_upnp_found">Found %1$d server(s)</string>
+    <string name="title_upnp_servers">UPnP/DLNA Servers</string>
+    <string name="status_searching_server">Searching %1$s…</string>
+    <string name="cancel">Cancel</string>
+    <string name="hint_domain">Domain (leave blank if not required)</string>
+    <string name="hint_username">Username (leave blank for anonymous access)</string>
+    <string name="hint_password">Password</string>
+    <string name="title_connect_smb">Connect to SMB Share</string>
+    <string name="message_connect_smb">Enter the server address and share name. Example: smb://192.168.1.10/Videos</string>
+    <string name="connect">Connect</string>
+    <string name="error_smb_address_required">Enter an SMB server and share name.</string>
+    <string name="status_searching_smb">Searching the SMB share…</string>
+    <string name="error_load">Could not load: %1$s</string>
+    <string name="network_error">Network error</string>
+    <string name="status_no_videos">No supported videos found.</string>
+    <string name="status_videos_found">%1$d video(s), sorted by newest first</string>
+    <string name="status_open_source_first">Open a UPnP server or SMB share first.</string>
+    <string name="status_refreshing">Refreshing list…</string>
+    <string name="error_upnp_search">UPnP search failed: %1$s</string>
+    <string name="player_title">Video Player</string>
+</resources>
