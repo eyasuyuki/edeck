@@ -37,6 +37,28 @@ object SmbCredentialsStore {
         SmbCredentials(values[0], values[1], values[2])
     }.getOrNull()
 
+    fun credentialsForResource(context: Context, resourceAddress: String): SmbCredentials? {
+        credentialsFor(context, resourceAddress)?.let { return it }
+        val recentSmbAddress = (RecentSourceStore.load(context) as? RecentSource.Smb)?.address
+        val candidateRoots = listOfNotNull(recentSmbAddress, lastSource(context)).distinct()
+        return candidateRoots.firstNotNullOfOrNull { root ->
+            if (isResourceUnderShare(root, resourceAddress)) credentialsFor(context, root) else null
+        }
+    }
+
+    private fun isResourceUnderShare(shareAddress: String, resourceAddress: String): Boolean = runCatching {
+        fun asUri(address: String) = Uri.parse(address.trim().let {
+            if (it.startsWith("smb://", true)) it else "smb://$it"
+        })
+        val root = asUri(shareAddress)
+        val resource = asUri(resourceAddress)
+        if (!root.scheme.equals("smb", true) || !resource.scheme.equals("smb", true)) return false
+        if (!root.host.equals(resource.host, true) || root.port != resource.port) return false
+        val rootPath = root.encodedPath.orEmpty().trimEnd('/')
+        val resourcePath = resource.encodedPath.orEmpty()
+        rootPath.isEmpty() || resourcePath == rootPath || resourcePath.startsWith("$rootPath/")
+    }.getOrDefault(false)
+
     fun remember(context: Context, address: String, credentials: SmbCredentials) {
         val sourceKey = sourceKey(address) ?: return
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")

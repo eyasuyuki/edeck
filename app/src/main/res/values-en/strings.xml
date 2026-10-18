@@ -1,4 +1,8 @@
 <resources>
+    <string name="action_settings">Settings</string>
+    <string name="settings_upnp">Search for UPnP/DLNA servers</string>
+    <string name="settings_smb">Enter an SMB URI</string>
+    <string name="hint_smb_uri">smb://192.168.1.10/Videos</string>
     <string name="app_name">EDeck</string>
     <string name="home_description">Browse videos from UPnP/DLNA or SMB shares.</string>
     <string name="action_search_upnp">Search UPnP/DLNA</string>
@@ -27,4 +31,11 @@
     <string name="status_refreshing">Refreshing list…</string>
     <string name="error_upnp_search">UPnP search failed: %1$s</string>
     <string name="player_title">Video Player</string>
+    <string name="status_restoring_source">Loading the last connected source…</string>
+    <string name="error_restore_source">Could not load the saved SMB credentials. Reconnect to the SMB share in Settings.</string>
+    <string name="password_show">Show</string>
+    <string name="password_hide">Hide</string>
+    <string name="status_cache_loading">Loading the saved video list…</string>
+    <string name="status_cache_empty">No saved list. Press Refresh to load videos.</string>
+    <string name="player_playback_error">Playback error: %1$s</string>
 </resources>

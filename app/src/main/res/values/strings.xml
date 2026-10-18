@@ -1,4 +1,8 @@
 <resources>
+    <string name="action_settings">設定</string>
+    <string name="settings_upnp">UPnP/DLNAを探索</string>
+    <string name="settings_smb">SMB URIを入力</string>
+    <string name="hint_smb_uri">smb://192.168.1.10/Videos</string>
     <string name="app_name">EDeck</string>
     <string name="home_description">UPnP/DLNAまたはSMBの共有から動画を読み込みます。</string>
     <string name="action_search_upnp">UPnP/DLNAを検索</string>
@@ -27,4 +31,11 @@
     <string name="status_refreshing">一覧を更新中…</string>
     <string name="error_upnp_search">UPnP検索に失敗しました: %1$s</string>
     <string name="player_title">動画再生</string>
+    <string name="status_restoring_source">前回の接続先から一覧を読み込み中…</string>
+    <string name="error_restore_source">前回のSMB認証情報を読み込めません。設定からSMB共有へ再接続してください。</string>
+    <string name="password_show">表示</string>
+    <string name="password_hide">非表示</string>
+    <string name="status_cache_loading">保存済みの動画一覧を読み込み中…</string>
+    <string name="status_cache_empty">保存済みの一覧はありません。「更新」を押して読み込んでください。</string>
+    <string name="player_playback_error">再生エラー: %1$s</string>
 </resources>

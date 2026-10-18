@@ -1,5 +1,6 @@
 package org.javaopen.edeck
 
+import android.content.Context
 import android.net.Uri
 import jcifs.CIFSContext
 import jcifs.config.PropertyConfiguration
@@ -15,17 +16,7 @@ object SmbRepository {
     fun scanVideos(address: String, domain: String, username: String, password: String): List<RemoteVideo> {
         val normalized = address.trim().let { if (it.startsWith("smb://", true)) it else "smb://$it" }
             .let { if (it.endsWith('/')) it else "$it/" }
-        val properties = Properties().apply {
-            setProperty("jcifs.smb.client.minVersion", "SMB202")
-            setProperty("jcifs.smb.client.maxVersion", "SMB311")
-            setProperty("jcifs.smb.client.responseTimeout", "10000")
-            setProperty("jcifs.smb.client.soTimeout", "10000")
-            setProperty("jcifs.smb.client.connTimeout", "10000")
-        }
-        val authenticator = NtlmPasswordAuthenticator(
-            domain.ifBlank { null }, username.ifBlank { null }, password
-        )
-        val cifs = BaseContext(PropertyConfiguration(properties)).withCredentials(authenticator)
+        val cifs = createContext(domain, username, password)
         activeContext = cifs
 
         val root = SmbFile(normalized, cifs)
@@ -46,7 +37,25 @@ object SmbRepository {
         return videos.sortedByDescending(RemoteVideo::lastModified)
     }
 
-    fun contextForPlayback(): CIFSContext = activeContext ?: error("SMB接続情報がありません。共有に再接続してください")
+    fun contextForPlayback(context: Context, address: String): CIFSContext {
+        val saved = SmbCredentialsStore.credentialsForResource(context, address)
+        return if (saved != null) createContext(saved.domain, saved.username, saved.password)
+        else activeContext ?: error("SMB credentials are unavailable. Reconnect to the share.")
+    }
+
+    private fun createContext(domain: String, username: String, password: String): CIFSContext {
+        val properties = Properties().apply {
+            setProperty("jcifs.smb.client.minVersion", "SMB202")
+            setProperty("jcifs.smb.client.maxVersion", "SMB311")
+            setProperty("jcifs.smb.client.responseTimeout", "60000")
+            setProperty("jcifs.smb.client.soTimeout", "60000")
+            setProperty("jcifs.smb.client.connTimeout", "30000")
+        }
+        val authenticator = NtlmPasswordAuthenticator(
+            domain.ifBlank { null }, username.ifBlank { null }, password
+        )
+        return BaseContext(PropertyConfiguration(properties)).withCredentials(authenticator)
+    }
 
     private fun String.isSupportedVideo(): Boolean = substringAfterLast('.', "").lowercase() in VIDEO_EXTENSIONS
 

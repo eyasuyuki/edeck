@@ -1,5 +1,6 @@
 package org.javaopen.edeck
 
+import android.content.Context
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.BaseDataSource
@@ -7,18 +8,19 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import jcifs.smb.SmbFile
 import jcifs.smb.SmbFileInputStream
+import java.io.BufferedInputStream
 import java.io.EOFException
 
 @UnstableApi
-class SmbDataSource : BaseDataSource(false) {
-    private var input: SmbFileInputStream? = null
+class SmbDataSource(private val context: Context) : BaseDataSource(false) {
+    private var input: BufferedInputStream? = null
     private var openedUri: android.net.Uri? = null
     private var remaining = C.LENGTH_UNSET.toLong()
 
     override fun open(dataSpec: DataSpec): Long {
         transferInitializing(dataSpec)
-        val file = SmbFile(dataSpec.uri.toString(), SmbRepository.contextForPlayback())
-        val stream = SmbFileInputStream(file)
+        val file = SmbFile(dataSpec.uri.toString(), SmbRepository.contextForPlayback(context, dataSpec.uri.toString()))
+        val stream = BufferedInputStream(SmbFileInputStream(file), READ_BUFFER_BYTES)
         try {
             var toSkip = dataSpec.position
             while (toSkip > 0) {
@@ -67,7 +69,11 @@ class SmbDataSource : BaseDataSource(false) {
         }
     }
 
-    class Factory : DataSource.Factory {
-        override fun createDataSource(): DataSource = SmbDataSource()
+    class Factory(private val context: Context) : DataSource.Factory {
+        override fun createDataSource(): DataSource = SmbDataSource(context)
+    }
+
+    private companion object {
+        const val READ_BUFFER_BYTES = 256 * 1024
     }
 }
