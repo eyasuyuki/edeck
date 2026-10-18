@@ -1,4 +1,4 @@
-package com.example.eplayer
+package org.javaopen.edeck
 
 import android.app.Activity
 import android.os.Bundle

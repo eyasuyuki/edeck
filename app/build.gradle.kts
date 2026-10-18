@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.eplayer"
+    namespace = "org.javaopen.edeck"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.eplayer"
+        applicationId = "org.javaopen.edeck"
         minSdk = 23
         targetSdk = 35
         versionCode = 1

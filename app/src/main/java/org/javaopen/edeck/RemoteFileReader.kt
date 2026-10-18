@@ -1,4 +1,4 @@
-package com.example.eplayer
+package org.javaopen.edeck
 
 import java.net.HttpURLConnection
 import java.net.URL
