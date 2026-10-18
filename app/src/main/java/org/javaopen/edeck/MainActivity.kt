@@ -99,11 +99,35 @@ class MainActivity : ComponentActivity() {
     private fun showSettingsDialog() {
         android.app.AlertDialog.Builder(this)
             .setTitle(R.string.action_settings)
-            .setItems(arrayOf(getString(R.string.settings_upnp), getString(R.string.settings_smb))) { _, choice ->
+            .setItems(arrayOf(
+                getString(R.string.settings_saved_sources),
+                getString(R.string.settings_upnp),
+                getString(R.string.settings_smb)
+            )) { _, choice ->
                 when (choice) {
-                    0 -> discoverUpnpServers()
-                    1 -> showSmbDialog()
+                    0 -> showSavedSourcesDialog()
+                    1 -> discoverUpnpServers()
+                    2 -> showSmbDialog()
                 }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showSavedSourcesDialog() {
+        val sources = RecentSourceStore.sources(this)
+        if (sources.isEmpty()) {
+            android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.settings_saved_sources)
+                .setMessage(R.string.status_no_saved_sources)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+            return
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle(R.string.settings_saved_sources)
+            .setItems(sources.map(RecentSource::label).toTypedArray()) { _, index ->
+                activateSource(sources[index])
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
@@ -284,22 +308,22 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun restoreRecentSource() {
-        val source = RecentSourceStore.load(this) ?: return
+        RecentSourceStore.load(this)?.let { activateSource(it, select = false) }
+    }
+
+    private fun activateSource(source: RecentSource, select: Boolean = true) {
+        if (select) RecentSourceStore.select(this, source)
         val loader: (() -> List<RemoteVideo>)? = when (source) {
-            is RecentSource.Smb -> {
-                val credentials = SmbCredentialsStore.credentialsFor(this, source.address)
-                if (credentials == null) null else {
-                    smbVideoLoader(source.address, credentials)
-                }
+            is RecentSource.Smb -> SmbCredentialsStore.credentialsFor(this, source.address)?.let {
+                smbVideoLoader(source.address, it)
             }
             is RecentSource.Upnp -> {
-                val server = UpnpMediaServer(
+                upnpVideoLoader(UpnpMediaServer(
                     source.name,
                     source.contentDirectoryUrl,
                     source.contentDirectoryUrl,
                     source.serviceType
-                )
-                upnpVideoLoader(server)
+                ))
             }
         }
         refreshVideos = loader?.let { sourceLoader ->
@@ -310,15 +334,14 @@ class MainActivity : ComponentActivity() {
             }
         }
         status.text = getString(R.string.status_cache_loading)
+        videos.removeAllViews()
         executor.execute {
             val cachedVideos = runCatching { VideoCacheStore.load(this, source.cacheKey) }.getOrNull()
             runOnUiThread {
-                if (cachedVideos != null) {
-                    showVideos(cachedVideos)
-                } else if (loader == null) {
-                    status.text = getString(R.string.error_restore_source)
-                } else {
-                    status.text = getString(R.string.status_cache_empty)
+                when {
+                    cachedVideos != null -> showVideos(cachedVideos)
+                    loader == null -> status.text = getString(R.string.error_restore_source)
+                    else -> status.text = getString(R.string.status_cache_empty)
                 }
             }
         }

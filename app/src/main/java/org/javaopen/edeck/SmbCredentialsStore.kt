@@ -39,8 +39,9 @@ object SmbCredentialsStore {
 
     fun credentialsForResource(context: Context, resourceAddress: String): SmbCredentials? {
         credentialsFor(context, resourceAddress)?.let { return it }
-        val recentSmbAddress = (RecentSourceStore.load(context) as? RecentSource.Smb)?.address
-        val candidateRoots = listOfNotNull(recentSmbAddress, lastSource(context)).distinct()
+        val savedSmbAddresses = RecentSourceStore.sources(context).filterIsInstance<RecentSource.Smb>().map { it.address }
+        val candidateRoots = (savedSmbAddresses + listOfNotNull(lastSource(context))).distinct()
+            .sortedByDescending(String::length)
         return candidateRoots.firstNotNullOfOrNull { root ->
             if (isResourceUnderShare(root, resourceAddress)) credentialsFor(context, root) else null
         }

@@ -1,17 +1,23 @@
 package org.javaopen.edeck
 
 import android.content.Context
+import android.net.ConnectivityManager
 import android.net.wifi.WifiManager
 import android.net.Uri
 import org.w3c.dom.Element
 import org.w3c.dom.Document
+import org.xml.sax.InputSource
+import java.io.StringReader
+import javax.xml.XMLConstants
 import java.io.ByteArrayInputStream
 import java.net.DatagramPacket
 import java.net.InetAddress
 import java.net.MulticastSocket
+import java.net.NetworkInterface
 import java.net.URL
 import java.net.HttpURLConnection
 import java.nio.charset.StandardCharsets
+import android.util.Log
 import java.time.OffsetDateTime
 import javax.xml.parsers.DocumentBuilderFactory
 
@@ -24,44 +30,79 @@ object UpnpRepository {
             setReferenceCounted(false)
             acquire()
         }
+        val connectivity = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val network = connectivity?.activeNetwork
+        val interfaceName = network?.let { connectivity.getLinkProperties(it)?.interfaceName }
+        val targets = listOf(
+            "upnp:rootdevice",
+            "urn:schemas-upnp-org:device:MediaServer:1",
+            "urn:schemas-upnp-org:service:ContentDirectory:1",
+            "ssdp:all"
+        )
+        val locations = linkedSetOf<String>()
+        var responseCount = 0
         try {
-            val request = ("M-SEARCH * HTTP/1.1\r\n" +
-                "HOST: 239.255.255.250:1900\r\n" +
-                "MAN: \"ssdp:discover\"\r\n" +
-                "MX: 3\r\n" +
-                "ST: ssdp:all\r\n\r\n").toByteArray(StandardCharsets.US_ASCII)
-            val locations = linkedSetOf<String>()
             MulticastSocket().use { socket ->
                 socket.soTimeout = RECEIVE_TIMEOUT_MS
                 socket.timeToLive = 2
-                socket.send(DatagramPacket(
-                    request, request.size, InetAddress.getByName(SSDP_ADDRESS), SSDP_PORT
-                ))
+                if (network != null) {
+                    runCatching { network.bindSocket(socket) }
+                        .onFailure { Log.w(TAG, "Could not bind SSDP socket to active network", it) }
+                }
+                if (interfaceName != null) {
+                    runCatching { NetworkInterface.getByName(interfaceName) }
+                        .getOrNull()?.let { networkInterface ->
+                            runCatching { socket.networkInterface = networkInterface }
+                                .onFailure { Log.w(TAG, "Could not set SSDP interface $interfaceName", it) }
+                        }
+                }
+                Log.i(TAG, "Starting SSDP discovery on interface=${socket.networkInterface?.name ?: interfaceName ?: "default"}")
+                targets.forEach { target ->
+                    val request = ("M-SEARCH * HTTP/1.1\r\n" +
+                        "HOST: $SSDP_ADDRESS:$SSDP_PORT\r\n" +
+                        "MAN: \"ssdp:discover\"\r\n" +
+                        "MX: 2\r\n" +
+                        "ST: $target\r\n\r\n").toByteArray(StandardCharsets.US_ASCII)
+                    socket.send(DatagramPacket(
+                        request, request.size, InetAddress.getByName(SSDP_ADDRESS), SSDP_PORT
+                    ))
+                }
                 val deadline = System.currentTimeMillis() + DISCOVERY_WINDOW_MS
                 while (System.currentTimeMillis() < deadline) {
                     val bytes = ByteArray(16 * 1024)
                     val packet = DatagramPacket(bytes, bytes.size)
                     try {
                         socket.receive(packet)
-                        val headers = String(packet.data, packet.offset, packet.length, StandardCharsets.ISO_8859_1)
-                            .lineSequence().mapNotNull { line ->
-                                val split = line.indexOf(':')
-                                if (split > 0) line.substring(0, split).trim().lowercase() to line.substring(split + 1).trim()
-                                else null
-                            }.toMap()
+                        responseCount++
+                        val headers = parseHeaders(packet.data, packet.offset, packet.length)
+                        Log.d(TAG, "SSDP response from ${packet.address.hostAddress}, ST=${headers["st"]}, LOCATION=${headers["location"]}")
                         headers["location"]?.let(locations::add)
                     } catch (_: java.net.SocketTimeoutException) {
                         // Continue until the discovery window closes.
                     }
                 }
             }
-            return locations.mapNotNull { location -> runCatching { readServer(URL(location)) }.getOrNull() }
-                .distinctBy { it.contentDirectoryUrl.toExternalForm() }
+            Log.i(TAG, "SSDP discovery received $responseCount response(s), ${locations.size} unique location(s)")
+            val servers = locations.mapNotNull { location ->
+                runCatching { readServer(URL(location)) }
+                    .onFailure { Log.w(TAG, "Could not read UPnP device description at $location", it) }
+                    .getOrNull()
+            }.distinctBy { it.contentDirectoryUrl.toExternalForm() }
                 .sortedBy { it.name.lowercase() }
+            Log.i(TAG, "UPnP discovery found ${servers.size} ContentDirectory server(s)")
+            return servers
         } finally {
             if (lock?.isHeld == true) lock.release()
         }
     }
+
+    internal fun parseHeaders(data: ByteArray, offset: Int, length: Int): Map<String, String> =
+        String(data, offset, length, StandardCharsets.ISO_8859_1)
+            .lineSequence().mapNotNull { line ->
+                val split = line.indexOf(':')
+                if (split > 0) line.substring(0, split).trim().lowercase() to line.substring(split + 1).trim()
+                else null
+            }.toMap()
 
     fun listVideos(server: UpnpMediaServer): List<RemoteVideo> {
         val videos = mutableListOf<RemoteVideo>()
@@ -170,12 +211,27 @@ object UpnpRepository {
         connection.getInputStream().use { parseXml(it.readBytes()) }
     }
 
-    private fun parseXml(bytes: ByteArray) = DocumentBuilderFactory.newInstance().apply {
-        isNamespaceAware = true
-        setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-        setFeature("http://xml.org/sax/features/external-general-entities", false)
-        setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-    }.newDocumentBuilder().parse(ByteArrayInputStream(bytes))
+    private fun parseXml(bytes: ByteArray): Document {
+        val factory = DocumentBuilderFactory.newInstance().apply {
+            isNamespaceAware = true
+            isExpandEntityReferences = false
+            runCatching { isXIncludeAware = false }
+            setOptionalFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
+            setOptionalFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            setOptionalFeature("http://xml.org/sax/features/external-general-entities", false)
+            setOptionalFeature("http://xml.org/sax/features/external-parameter-entities", false)
+        }
+        val builder = factory.newDocumentBuilder().apply {
+            // Some Android XML parsers reject the security feature flags above. Never
+            // allow their fallback parser to fetch an external DTD or entity over the network.
+            setEntityResolver { _, _ -> InputSource(StringReader("")) }
+        }
+        return builder.parse(ByteArrayInputStream(bytes))
+    }
+
+    private fun DocumentBuilderFactory.setOptionalFeature(name: String, value: Boolean) {
+        runCatching { setFeature(name, value) }
+    }
 
     private fun Element.firstText(localName: String): String =
         getElementsByTagNameNS("*", localName).item(0)?.textContent?.trim().orEmpty()
@@ -188,10 +244,11 @@ object UpnpRepository {
     private fun String.isVideoUrl(): Boolean = substringBefore('?').substringBefore('#').substringAfterLast('.', "")
         .lowercase() in VIDEO_EXTENSIONS
 
+    private const val TAG = "EDeck-UPnP"
     private const val SSDP_ADDRESS = "239.255.255.250"
     private const val SSDP_PORT = 1900
     private const val RECEIVE_TIMEOUT_MS = 350
-    private const val DISCOVERY_WINDOW_MS = 4_000L
+    private const val DISCOVERY_WINDOW_MS = 6_000L
     private const val HTTP_TIMEOUT_MS = 12_000
     private const val PAGE_SIZE = 200
     private const val MAX_CONTAINERS = 10_000

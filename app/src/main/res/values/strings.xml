@@ -38,4 +38,6 @@
     <string name="status_cache_loading">保存済みの動画一覧を読み込み中…</string>
     <string name="status_cache_empty">保存済みの一覧はありません。「更新」を押して読み込んでください。</string>
     <string name="player_playback_error">再生エラー: %1$s</string>
+    <string name="settings_saved_sources">保存済みソース</string>
+    <string name="status_no_saved_sources">保存済みソースはありません。UPnP探索またはSMB URI入力からソースを追加してください。</string>
 </resources>
