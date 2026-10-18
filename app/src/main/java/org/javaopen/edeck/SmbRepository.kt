@@ -47,9 +47,9 @@ object SmbRepository {
         val properties = Properties().apply {
             setProperty("jcifs.smb.client.minVersion", "SMB202")
             setProperty("jcifs.smb.client.maxVersion", "SMB311")
-            setProperty("jcifs.smb.client.responseTimeout", "60000")
-            setProperty("jcifs.smb.client.soTimeout", "60000")
-            setProperty("jcifs.smb.client.connTimeout", "30000")
+            setProperty("jcifs.smb.client.responseTimeout", "20000")
+            setProperty("jcifs.smb.client.soTimeout", "30000")
+            setProperty("jcifs.smb.client.connTimeout", "15000")
         }
         val authenticator = NtlmPasswordAuthenticator(
             domain.ifBlank { null }, username.ifBlank { null }, password

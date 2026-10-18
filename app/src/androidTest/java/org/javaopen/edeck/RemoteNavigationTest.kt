@@ -20,35 +20,53 @@ class RemoteNavigationTest {
     fun launchApp() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         device = UiDevice.getInstance(instrumentation)
+        device.wakeUp()
+        device.pressHome()
+        device.waitForIdle()
         instrumentation.startActivitySync(
             Intent(instrumentation.targetContext, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         )
-        assertTrue("Main screen did not appear", device.wait(Until.hasObject(By.textContains("DLNAを検索")), 5_000))
+        val refreshLabel = instrumentation.targetContext.getString(R.string.action_refresh)
+        device.waitForIdle()
+        assertTrue("Main screen did not appear", device.wait(Until.hasObject(By.desc(refreshLabel)), 15_000))
     }
 
     @Test
     fun dpadMovesFocusBetweenSourceActions() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val upnpButton = device.findObject(By.textContains("DLNAを検索"))
-        val smbButton = device.findObject(By.text("SMB共有を開く"))
+        val refreshLabel = instrumentation.targetContext.getString(R.string.action_refresh)
+        val settingsLabel = instrumentation.targetContext.getString(R.string.action_settings)
+        val smbLabel = instrumentation.targetContext.getString(R.string.settings_smb)
+        val savedSourcesLabel = instrumentation.targetContext.getString(R.string.settings_saved_sources)
 
-        assertTrue("UPnP button should receive initial focus", upnpButton.isFocused)
+        val refreshButton = device.findObject(By.desc(refreshLabel))
+        val settingsButton = device.findObject(By.desc(settingsLabel))
+        assertTrue("Refresh button should receive initial focus", refreshButton.isFocused)
 
-        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_RIGHT)
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN)
         device.waitForIdle()
-        assertTrue("D-pad right should focus SMB", smbButton.isFocused)
+        assertTrue("D-pad down should focus Settings", settingsButton.isFocused)
 
-        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_LEFT)
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP)
         device.waitForIdle()
-        assertTrue("D-pad left should return focus to UPnP", upnpButton.isFocused)
+        assertTrue("D-pad up should return focus to Refresh", refreshButton.isFocused)
 
-        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_RIGHT)
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN)
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_ENTER)
+        device.waitForIdle()
+        assertTrue(
+            "Enter should open Settings",
+            device.wait(Until.hasObject(By.text(savedSourcesLabel)), 3_000)
+        )
+        assertTrue("SMB source action should be available", device.hasObject(By.text(smbLabel)))
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN)
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN)
         instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_ENTER)
         device.waitForIdle()
         assertTrue(
             "Enter should open the SMB connection form",
-            device.wait(Until.hasObject(By.text("SMB共有に接続")), 3_000)
+            device.wait(Until.hasObject(By.text(instrumentation.targetContext.getString(R.string.title_connect_smb))), 3_000)
         )
     }
 }

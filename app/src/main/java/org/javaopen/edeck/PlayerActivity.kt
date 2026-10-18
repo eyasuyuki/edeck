@@ -47,6 +47,7 @@ class PlayerActivity : Activity() {
                 BUFFER_FOR_PLAYBACK_MS,
                 BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
             )
+            .setTargetBufferBytes(TARGET_BUFFER_BYTES)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
@@ -128,10 +129,11 @@ class PlayerActivity : Activity() {
     private fun watchedKey() = "watched:$mediaUri"
 
     companion object {
-        private const val MIN_BUFFER_MS = 45_000
-        private const val MAX_BUFFER_MS = 120_000
-        private const val BUFFER_FOR_PLAYBACK_MS = 8_000
-        private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 20_000
+        private const val MIN_BUFFER_MS = 60_000
+        private const val MAX_BUFFER_MS = 180_000
+        private const val BUFFER_FOR_PLAYBACK_MS = 3_000
+        private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 8_000
+        private const val TARGET_BUFFER_BYTES = 96 * 1024 * 1024
         private const val HTTP_CONNECT_TIMEOUT_MS = 30_000
         private const val HTTP_READ_TIMEOUT_MS = 60_000
         private const val SKIP_INTERVAL_MS = 10_000L

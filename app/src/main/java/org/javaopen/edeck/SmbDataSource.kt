@@ -10,34 +10,42 @@ import jcifs.smb.SmbFile
 import jcifs.smb.SmbFileInputStream
 import java.io.BufferedInputStream
 import java.io.EOFException
+import java.io.InputStream
 
 @UnstableApi
 class SmbDataSource(private val context: Context) : BaseDataSource(false) {
-    private var input: BufferedInputStream? = null
+    private var input: RetryingInputStream? = null
     private var openedUri: android.net.Uri? = null
     private var remaining = C.LENGTH_UNSET.toLong()
+    private var openStreamAt: ((Long) -> InputStream)? = null
 
     override fun open(dataSpec: DataSpec): Long {
         transferInitializing(dataSpec)
-        val file = SmbFile(dataSpec.uri.toString(), SmbRepository.contextForPlayback(context, dataSpec.uri.toString()))
-        val stream = BufferedInputStream(SmbFileInputStream(file), READ_BUFFER_BYTES)
+        val uri = dataSpec.uri
+        val cifsContext = SmbRepository.contextForPlayback(context, uri.toString())
+        val file = SmbFile(uri.toString(), cifsContext)
         try {
-            var toSkip = dataSpec.position
-            while (toSkip > 0) {
-                val skipped = stream.skip(toSkip)
-                if (skipped > 0) toSkip -= skipped
-                else if (stream.read() < 0) throw EOFException("SMBファイルの再生位置に移動できません")
-                else toSkip--
-            }
-            input = stream
-            openedUri = dataSpec.uri
             val fileLength = file.length()
             remaining = if (dataSpec.length != C.LENGTH_UNSET.toLong()) dataSpec.length
                 else if (fileLength >= dataSpec.position) fileLength - dataSpec.position else C.LENGTH_UNSET.toLong()
+            openStreamAt = { position ->
+                val reopenedFile = SmbFile(uri.toString(), cifsContext)
+                BufferedInputStream(SmbFileInputStream(reopenedFile), READ_BUFFER_BYTES).also { stream ->
+                    skipFully(stream, position)
+                }
+            }
+            input = RetryingInputStream(
+                initialStream = openStreamAt!!.invoke(dataSpec.position),
+                initialPosition = dataSpec.position,
+                reopenAt = { position -> openStreamAt!!.invoke(position) }
+            )
+            openedUri = uri
             transferStarted(dataSpec)
             return remaining
         } catch (failure: Throwable) {
-            stream.close()
+            input?.close()
+            input = null
+            openStreamAt = null
             throw failure
         }
     }
@@ -46,7 +54,10 @@ class SmbDataSource(private val context: Context) : BaseDataSource(false) {
         if (length == 0) return 0
         if (remaining == 0L) return C.RESULT_END_OF_INPUT
         val allowed = if (remaining == C.LENGTH_UNSET.toLong()) length else minOf(length.toLong(), remaining).toInt()
-        val count = input?.read(buffer, offset, allowed) ?: C.RESULT_END_OF_INPUT
+        val count = input?.read(
+            buffer, offset, allowed,
+            retryOnUnexpectedEof = remaining != C.LENGTH_UNSET.toLong()
+        ) ?: C.RESULT_END_OF_INPUT
         if (count == -1) {
             if (remaining == C.LENGTH_UNSET.toLong()) return C.RESULT_END_OF_INPUT
             throw EOFException("SMBファイルの読み込み中に接続が終了しました")
@@ -65,7 +76,18 @@ class SmbDataSource(private val context: Context) : BaseDataSource(false) {
             input?.close()
         } finally {
             input = null
+            openStreamAt = null
             transferEnded()
+        }
+    }
+
+    private fun skipFully(stream: InputStream, position: Long) {
+        var remainingToSkip = position
+        while (remainingToSkip > 0) {
+            val skipped = stream.skip(remainingToSkip)
+            if (skipped > 0) remainingToSkip -= skipped
+            else if (stream.read() < 0) throw EOFException("SMBファイルの再生位置に移動できません")
+            else remainingToSkip--
         }
     }
 

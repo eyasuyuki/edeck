@@ -48,18 +48,22 @@ object RecentSourceStore {
 
     @Synchronized
     fun select(context: Context, source: RecentSource) {
+        val selected = when (source) {
+            is RecentSource.Smb -> source.copy(address = normalizeSmbAddress(source.address))
+            is RecentSource.Upnp -> source
+        }
         val prefs = preferences(context)
-        val allSources = (sources(context).filterNot { it.cacheKey == source.cacheKey } + source)
+        val allSources = (sources(context).filterNot { it.cacheKey == selected.cacheKey } + selected)
         prefs.edit()
             .putString(SOURCES, serializeSources(allSources))
-            .putString(CURRENT_ID, source.cacheKey)
+            .putString(CURRENT_ID, selected.cacheKey)
             .apply()
     }
 
     @Synchronized
     fun saveSmb(context: Context, address: String) = select(
         context,
-        RecentSource.Smb(address.trim().let { if (it.startsWith("smb://", true)) it else "smb://$it" })
+        RecentSource.Smb(normalizeSmbAddress(address))
     )
 
     @Synchronized
@@ -121,6 +125,11 @@ object RecentSourceStore {
             else -> null
         }
     }.getOrNull()
+
+    private fun normalizeSmbAddress(address: String): String {
+        val withScheme = address.trim().let { if (it.startsWith("smb://", true)) it else "smb://$it" }
+        return withScheme.trimEnd('/')
+    }
 
     private fun preferences(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }

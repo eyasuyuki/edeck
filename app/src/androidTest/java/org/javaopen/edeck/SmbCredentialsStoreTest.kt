@@ -35,4 +35,48 @@ class SmbCredentialsStoreTest {
             }.commit()
         }
     }
+
+    @Test
+    fun credentialsForMultipleSavedSharesAreResolvedByMostSpecificRoot() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val suffix = System.currentTimeMillis()
+        val host = "multi-$suffix.local"
+        val broadShare = "smb://$host/Media"
+        val nestedShare = "$broadShare/Private"
+        val broadCredentials = SmbCredentials("WORKGROUP", "general", "general-$suffix")
+        val nestedCredentials = SmbCredentials("WORKGROUP", "private", "private-$suffix")
+        val smbPreferences = context.getSharedPreferences("smb_connections", Context.MODE_PRIVATE)
+        val sourcePreferences = context.getSharedPreferences("recent_source", Context.MODE_PRIVATE)
+        val oldSmb = smbPreferences.all
+        val oldSources = sourcePreferences.all
+
+        try {
+            SmbCredentialsStore.remember(context, broadShare, broadCredentials)
+            SmbCredentialsStore.remember(context, nestedShare, nestedCredentials)
+            RecentSourceStore.saveSmb(context, broadShare)
+            RecentSourceStore.saveSmb(context, nestedShare)
+
+            assertEquals(broadCredentials, SmbCredentialsStore.credentialsForResource(context, "$broadShare/Movies/a.mp4"))
+            assertEquals(nestedCredentials, SmbCredentialsStore.credentialsForResource(context, "$nestedShare/a.mp4"))
+            assertNull(SmbCredentialsStore.credentialsForResource(context, "smb://$host/Media2/a.mp4"))
+        } finally {
+            restorePreferences(smbPreferences, oldSmb)
+            restorePreferences(sourcePreferences, oldSources)
+        }
+    }
+
+    private fun restorePreferences(preferences: android.content.SharedPreferences, values: Map<String, *>) {
+        preferences.edit().clear().apply {
+            values.forEach { (key, value) ->
+                when (value) {
+                    is String -> putString(key, value)
+                    is Boolean -> putBoolean(key, value)
+                    is Int -> putInt(key, value)
+                    is Long -> putLong(key, value)
+                    is Float -> putFloat(key, value)
+                    is Set<*> -> putStringSet(key, value.filterIsInstance<String>().toSet())
+                }
+            }
+        }.commit()
+    }
 }
