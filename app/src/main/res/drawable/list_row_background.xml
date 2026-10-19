@@ -1,4 +1,6 @@
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- List rows are selected by ListView itself, not by focusable child buttons, so these
+         selected/activated states give the remote's current row a visible Material surface. -->
     <item android:state_selected="true">
         <shape android:shape="rectangle">
             <solid android:color="@color/edeck_row_focus" />

@@ -10,6 +10,8 @@ import jcifs.smb.SmbFile
 import java.util.Properties
 
 object SmbRepository {
+    // Retain a context for playback when older saved credentials cannot be resolved;
+    // normal playback still prefers the credential store's share-to-file matching.
     @Volatile
     private var activeContext: CIFSContext? = null
 
@@ -22,6 +24,8 @@ object SmbRepository {
         val root = SmbFile(normalized, cifs)
         require(root.exists()) { "SMB共有に接続できません" }
         val videos = mutableListOf<RemoteVideo>()
+        // The list screen needs recursive discovery, but iterative traversal avoids
+        // overflowing the call stack on deeply nested shares and supports an entry cap.
         val pending = ArrayDeque<SmbFile>()
         pending.add(root)
         var visited = 0
@@ -44,6 +48,8 @@ object SmbRepository {
         activeContext = cifs
         val directory = SmbFile(normalized, cifs)
         require(directory.exists() && directory.isDirectory) { "SMBフォルダーを開けません" }
+        // The browser intentionally reads one directory at a time: unlike the library
+        // scan this stays responsive on large shares and gives the user folder context.
         return directory.listFiles().mapNotNull { file ->
             when {
                 file.isDirectory -> RemoteBrowserItem(file.name.trimEnd('/'), directoryId = file.url.toString())

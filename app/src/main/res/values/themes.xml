@@ -1,4 +1,6 @@
 <resources>
+    <!-- A dark Material 3 surface keeps a bright TV from washing out the video list; the
+         custom primary container doubles as a high-contrast D-pad focus treatment. -->
     <style name="Theme.EDeck" parent="Theme.Material3.Dark.NoActionBar">
         <item name="colorPrimary">@color/edeck_primary</item>
         <item name="colorOnPrimary">@color/edeck_on_primary</item>

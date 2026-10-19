@@ -41,7 +41,7 @@
     <string name="video_mark_unwatched">▶  %1$s</string>
     <string name="video_mark_watched">✓  %1$s</string>
     <string name="video_mark_completed">★  %1$s</string>
-    <string name="video_mark_position">▶  %1$s  (%2$sから再生)</string>
+    <string name="video_mark_position">✓  %1$s  (%2$sから再生)</string>
     <string name="status_open_source_first">先にUPnPサーバーまたはSMB共有を開いてください</string>
     <string name="status_refreshing">一覧を更新中…</string>
     <string name="error_upnp_search">UPnP検索に失敗しました: %1$s</string>

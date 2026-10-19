@@ -13,6 +13,8 @@ import java.io.InputStream
 class RetryingInputStreamTest {
     @Test
     fun reconnectsFromFirstByteNotYetDelivered() {
+        // In-memory streams make the failure deterministic while checking the key invariant:
+        // bytes already returned to ExoPlayer must never be repeated after reconnect.
         var firstRead = true
         val resumeOffsets = mutableListOf<Long>()
         val initialStream = object : InputStream() {
@@ -59,6 +61,8 @@ class RetryingInputStreamTest {
 
     @Test
     fun retriesUnexpectedEofWhenTheResourceLengthIsKnown() {
+        // A short read looks like success until the caller tells us the file length is known;
+        // this case protects SMB playback from silently treating a dropped connection as EOF.
         var reconnectCount = 0
         val source = RetryingInputStream(
             initialStream = ByteArrayInputStream(byteArrayOf()),

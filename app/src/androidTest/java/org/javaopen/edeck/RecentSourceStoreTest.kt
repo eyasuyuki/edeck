@@ -12,6 +12,8 @@ import java.net.URL
 
 @RunWith(AndroidJUnit4::class)
 class RecentSourceStoreTest {
+    // Instrumented preferences are persistent device state, so each test snapshots and
+    // restores them instead of relying on a clean emulator between runs.
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
@@ -25,6 +27,8 @@ class RecentSourceStoreTest {
                 "urn:schemas-upnp-org:service:ContentDirectory:1"
             )
 
+            // Exercise both protocols because their display labels differ while the store
+            // must preserve one consistent current-source selection for either kind.
             RecentSourceStore.saveSmb(context, "server.local/Movies")
             RecentSourceStore.saveUpnp(context, UpnpMediaServer(upnp.name, upnp.contentDirectoryUrl, upnp.contentDirectoryUrl, upnp.serviceType))
             assertEquals(listOf(smb, upnp), RecentSourceStore.sources(context))

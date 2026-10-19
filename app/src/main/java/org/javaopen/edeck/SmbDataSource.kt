@@ -22,6 +22,8 @@ class SmbDataSource(private val context: Context) : BaseDataSource(false) {
     override fun open(dataSpec: DataSpec): Long {
         transferInitializing(dataSpec)
         val uri = dataSpec.uri
+        // ExoPlayer may reopen a resource at a byte offset after buffering or seeking, so
+        // each open resolves credentials from the actual file URI rather than the list row.
         val cifsContext = SmbRepository.contextForPlayback(context, uri.toString())
         val file = SmbFile(uri.toString(), cifsContext)
         try {
@@ -31,6 +33,8 @@ class SmbDataSource(private val context: Context) : BaseDataSource(false) {
             openStreamAt = { position ->
                 val reopenedFile = SmbFile(uri.toString(), cifsContext)
                 BufferedInputStream(SmbFileInputStream(reopenedFile), READ_BUFFER_BYTES).also { stream ->
+                    // jcifs streams are sequential; skipping here emulates the random-access
+                    // ranges ExoPlayer expects when it seeks or retries a media read.
                     skipFully(stream, position)
                 }
             }
@@ -54,6 +58,8 @@ class SmbDataSource(private val context: Context) : BaseDataSource(false) {
         if (length == 0) return 0
         if (remaining == 0L) return C.RESULT_END_OF_INPUT
         val allowed = if (remaining == C.LENGTH_UNSET.toLong()) length else minOf(length.toLong(), remaining).toInt()
+        // A known content length lets us distinguish a normal response EOF from a dropped
+        // SMB connection that ended before all requested bytes arrived.
         val count = input?.read(
             buffer, offset, allowed,
             retryOnUnexpectedEof = remaining != C.LENGTH_UNSET.toLong()
@@ -82,6 +88,8 @@ class SmbDataSource(private val context: Context) : BaseDataSource(false) {
     }
 
     private fun skipFully(stream: InputStream, position: Long) {
+        // InputStream.skip() is allowed to skip fewer bytes than requested (including 0),
+        // so keep consuming until the exact resume offset is reached or EOF proves it invalid.
         var remainingToSkip = position
         while (remainingToSkip > 0) {
             val skipped = stream.skip(remainingToSkip)

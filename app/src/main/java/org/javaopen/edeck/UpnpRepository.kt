@@ -28,12 +28,16 @@ object UpnpRepository {
         val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
         val lock = wifi?.createMulticastLock("edeck-upnp")?.apply {
             setReferenceCounted(false)
+            // Android filters multicast packets unless an app explicitly holds this lock;
+            // SSDP discovery otherwise appears to find no servers on some TV networks.
             acquire()
         }
         val connectivity = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
         val network = connectivity?.activeNetwork
         val interfaceName = network?.let { connectivity.getLinkProperties(it)?.interfaceName }
         val targets = listOf(
+            // Media servers vary in which SSDP search target they answer, so ask using
+            // common device/service targets and deduplicate the returned locations.
             "upnp:rootdevice",
             "urn:schemas-upnp-org:device:MediaServer:1",
             "urn:schemas-upnp-org:service:ContentDirectory:1",
@@ -46,6 +50,8 @@ object UpnpRepository {
                 socket.soTimeout = RECEIVE_TIMEOUT_MS
                 socket.timeToLive = 2
                 if (network != null) {
+                    // Bind multicast traffic to Android's active LAN; the default route can
+                    // otherwise send discovery over a VPN or a different network interface.
                     runCatching { network.bindSocket(socket) }
                         .onFailure { Log.w(TAG, "Could not bind SSDP socket to active network", it) }
                 }
@@ -68,6 +74,8 @@ object UpnpRepository {
                     ))
                 }
                 val deadline = System.currentTimeMillis() + DISCOVERY_WINDOW_MS
+                // A socket timeout only ends one receive attempt. Continue until the shared
+                // discovery window expires so slower NAS devices still have time to reply.
                 while (System.currentTimeMillis() < deadline) {
                     val bytes = ByteArray(16 * 1024)
                     val packet = DatagramPacket(bytes, bytes.size)
@@ -106,6 +114,8 @@ object UpnpRepository {
 
     fun listVideos(server: UpnpMediaServer): List<RemoteVideo> {
         val videos = mutableListOf<RemoteVideo>()
+        // Some servers contain cycles or repeat container IDs. Track visited IDs and use
+        // an explicit queue so traversal remains bounded and does not recurse on the stack.
         val visited = mutableSetOf<String>()
         val pending = ArrayDeque<String>().apply { add("0") }
         while (pending.isNotEmpty()) {
@@ -115,6 +125,8 @@ object UpnpRepository {
             var pageReturned = 0
             var totalMatches = 0
             do {
+                // UPnP servers commonly cap a Browse response, so walk each container in
+                // pages instead of assuming its first response is the whole directory.
                 val page = browse(server, objectId, start)
                 val didl = page.didl
                 val containers = didl.getElementsByTagNameNS("*", "container")
@@ -126,6 +138,8 @@ object UpnpRepository {
                 for (index in 0 until items.length) {
                     val item = items.item(index) as? Element ?: continue
                     val itemClass = item.firstText("class")
+                    // A ContentDirectory may mix audio, images, and generic objects with
+                    // videos; exclude known non-video classes before considering resources.
                     if (itemClass.isNotEmpty() && !itemClass.startsWith("object.item.videoItem")) continue
                     val title = item.firstText("title").ifBlank { "動画" }
                     val date = item.firstText("date").toTimestamp()
@@ -151,6 +165,9 @@ object UpnpRepository {
     }
 
     fun browseDirectory(server: UpnpMediaServer, objectId: String): List<RemoteBrowserItem> {
+        // The browser requests only the selected container's direct children. Recursive
+        // expansion here would make navigating one folder pay the cost of scanning all of
+        // the server again, defeating the point of directory browsing.
         val entries = mutableListOf<RemoteBrowserItem>()
         var start = 0
         var pageReturned: Int
@@ -190,6 +207,8 @@ object UpnpRepository {
             val resource = resources.item(index) as? Element ?: continue
             val address = resource.textContent.trim()
             val mime = resource.getAttribute("protocolInfo").split(':').getOrNull(2).orEmpty().lowercase()
+            // Prefer protocol metadata, but accept extension-only servers that leave MIME
+            // fields vague; only HTTP(S) resources can be opened by the configured player.
             if ((mime.startsWith("video/") || address.isVideoUrl()) &&
                 (address.startsWith("http://", true) || address.startsWith("https://", true))) {
                 return RemoteVideo(title, Uri.parse(address), date)
@@ -200,6 +219,8 @@ object UpnpRepository {
 
     private fun readServer(descriptionUrl: URL): UpnpMediaServer {
         val document = httpGet(descriptionUrl)
+        // Device descriptions may specify a base URL for relative control paths; resolving
+        // against it avoids constructing invalid endpoints from the description URL.
         val baseAddress = document.getElementsByTagNameNS("*", "URLBase").item(0)?.textContent?.trim()
             ?.takeIf(String::isNotEmpty)?.let(::URL) ?: descriptionUrl
         val device = document.getElementsByTagNameNS("*", "device").item(0) as? Element
@@ -220,6 +241,8 @@ object UpnpRepository {
     private data class BrowsePage(val didl: Document, val numberReturned: Int, val totalMatches: Int)
 
     private fun browse(server: UpnpMediaServer, objectId: String, start: Int): BrowsePage {
+        // Object IDs and service types come from the remote server; XML-escape the ID so
+        // names containing punctuation cannot break the SOAP envelope.
         val escapedId = objectId.xmlEscape()
         val soap = """<?xml version="1.0" encoding="utf-8"?>
             <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
@@ -233,6 +256,8 @@ object UpnpRepository {
             readTimeout = HTTP_TIMEOUT_MS
             requestMethod = "POST"
             doOutput = true
+            // ContentDirectory is a SOAP action: both the XML envelope and this header are
+            // required by common DLNA servers before they return DIDL-Lite metadata.
             setRequestProperty("Content-Type", "text/xml; charset=\"utf-8\"")
             setRequestProperty("SOAPACTION", "\"${server.serviceType}#Browse\"")
         }
@@ -264,6 +289,8 @@ object UpnpRepository {
             isNamespaceAware = true
             isExpandEntityReferences = false
             runCatching { isXIncludeAware = false }
+            // Device metadata is network input. Disable DTD/external entities so parsing a
+            // malicious description cannot make the TV fetch local files or arbitrary URLs.
             setOptionalFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
             setOptionalFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
             setOptionalFeature("http://xml.org/sax/features/external-general-entities", false)
@@ -278,6 +305,8 @@ object UpnpRepository {
     }
 
     private fun DocumentBuilderFactory.setOptionalFeature(name: String, value: Boolean) {
+        // Android's XML providers support different feature subsets; the entity resolver
+        // below remains the fallback protection when a hardening flag is unavailable.
         runCatching { setFeature(name, value) }
     }
 
@@ -287,6 +316,8 @@ object UpnpRepository {
     private fun String.xmlEscape() = replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         .replace("\"", "&quot;").replace("'", "&apos;")
 
+    // Missing or non-ISO dates sort as the oldest entries instead of failing the entire
+    // server scan because one item's metadata is incomplete.
     private fun String.toTimestamp(): Long = runCatching { OffsetDateTime.parse(this).toInstant().toEpochMilli() }.getOrDefault(0L)
 
     private fun String.isVideoUrl(): Boolean = substringBefore('?').substringBefore('#').substringAfterLast('.', "")

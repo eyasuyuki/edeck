@@ -14,6 +14,7 @@ import kotlin.concurrent.thread
 class UpnpRepositoryTest {
     @Test
     fun parsesSsdpHeadersWithoutDependingOnHeaderCase() {
+        // HTTP header names are case-insensitive, and real SSDP devices do not agree on case.
         val message = "HTTP/1.1 200 OK\r\nST: urn:schemas-upnp-org:device:MediaServer:1\r\n" +
             "LOCATION: http://192.0.2.20:1400/device.xml\r\n\r\n"
 
@@ -25,6 +26,8 @@ class UpnpRepositoryTest {
 
     @Test
     fun browsesUpnpServerAndExtractsVideoResources() {
+        // A loopback SOAP endpoint exercises the actual HTTP/XML path without depending on
+        // a particular NAS, router, or multicast behavior in the test environment.
         ServerSocket(0).use { server ->
             val failure = arrayOfNulls<Throwable>(1)
             val worker = thread {

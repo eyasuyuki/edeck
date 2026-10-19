@@ -3,7 +3,11 @@ package org.javaopen.edeck
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** Small HTTPS text-file reader. Keep network I/O off the main thread. */
+/**
+ * Small HTTP(S) text-file reader. Callers run it off the main thread because requests can
+ * wait on a remote server; the byte cap keeps a URL that is not actually a small text file
+ * from consuming unbounded memory while the response is buffered.
+ */
 object RemoteFileReader {
     private const val MAX_BYTES = 2 * 1024 * 1024
 
@@ -31,6 +35,8 @@ object RemoteFileReader {
                 output.toByteArray().toString(Charsets.UTF_8)
             }
         } finally {
+            // Always release the socket even when status validation or the size cap fails;
+            // callers may retry the same URL immediately after handling the error.
             connection.disconnect()
         }
     }

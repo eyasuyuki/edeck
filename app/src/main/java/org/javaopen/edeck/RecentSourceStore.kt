@@ -6,6 +6,8 @@ import org.json.JSONObject
 import java.net.URL
 
 sealed class RecentSource {
+    // The key identifies cache entries and the current selection across launches, so it
+    // must depend on stable connection details rather than a display name alone.
     abstract val cacheKey: String
     abstract val label: String
 
@@ -30,10 +32,14 @@ object RecentSourceStore {
     private const val UPNP_URL = "upnp_url"
     private const val UPNP_SERVICE = "upnp_service"
 
+    // Preferences hold both the source collection and current ID; synchronize compound
+    // reads/writes so two callbacks cannot each overwrite the other's source update.
     @Synchronized
     fun sources(context: Context): List<RecentSource> {
         val prefs = preferences(context)
         val stored = prefs.getString(SOURCES, null)
+        // Keep reading the former single-source format so users upgrading from older
+        // builds do not lose the connection they had already configured.
         if (stored != null) return parseSources(stored)
         return legacySource(prefs)?.let(::listOf).orEmpty()
     }
@@ -43,6 +49,8 @@ object RecentSourceStore {
         val prefs = preferences(context)
         val allSources = sources(context)
         val currentId = prefs.getString(CURRENT_ID, null)
+        // CURRENT_ID preserves the user's last choice; the first saved source is a
+        // migration/fallback path for preferences created before multiple sources existed.
         return allSources.firstOrNull { it.cacheKey == currentId } ?: allSources.firstOrNull()
     }
 
@@ -53,6 +61,8 @@ object RecentSourceStore {
             is RecentSource.Upnp -> source
         }
         val prefs = preferences(context)
+        // Replace by cache key so reconnecting to the same share refreshes its record
+        // instead of creating duplicate entries in the source picker.
         val allSources = (sources(context).filterNot { it.cacheKey == selected.cacheKey } + selected)
         prefs.edit()
             .putString(SOURCES, serializeSources(allSources))
@@ -127,6 +137,8 @@ object RecentSourceStore {
     }.getOrNull()
 
     private fun normalizeSmbAddress(address: String): String {
+        // A trailing slash is not a different SMB share; normalize it so selection,
+        // credential lookup, and cached lists use one identity for that connection.
         val withScheme = address.trim().let { if (it.startsWith("smb://", true)) it else "smb://$it" }
         return withScheme.trimEnd('/')
     }

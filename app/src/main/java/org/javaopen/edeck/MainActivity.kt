@@ -23,6 +23,8 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.util.concurrent.Executors
 
 class MainActivity : ComponentActivity() {
+    // Network scans and SQLite cache access share one worker so neither blocks TV input,
+    // and source changes cannot launch several expensive scans at the same time.
     private val executor = Executors.newSingleThreadExecutor()
     private lateinit var status: TextView
     private lateinit var videos: ListView
@@ -36,6 +38,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var refreshButton: MaterialButton
     private lateinit var settingsButton: MaterialButton
     private lateinit var startupBanner: View
+    // PlayerActivity writes these same URI-keyed flags and positions; keeping one store
+    // lets the list reflect playback state without waiting for another network scan.
     private val preferences by lazy { getSharedPreferences("playback", MODE_PRIVATE) }
     private var refreshVideos: (() -> List<RemoteVideo>)? = null
     private var currentVideos: List<RemoteVideo> = emptyList()
@@ -43,6 +47,8 @@ class MainActivity : ComponentActivity() {
     private val browserPath = mutableListOf<String>()
     private var startupRestoreLoading = false
     private val showStartupBannerRunnable = Runnable {
+        // Fast cache hits should render directly; only show a banner when restoration
+        // takes long enough for the initial blank frame to become noticeable.
         if (startupRestoreLoading) startupBanner.visibility = View.VISIBLE
     }
 
@@ -55,6 +61,8 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Playback updates SharedPreferences while this screen is stopped. Rebinding just
+        // the rows picks up those flags while preserving the list, scroll, and focus state.
         if (::videoAdapter.isInitialized) videoAdapter.refreshMarks()
         if (::browserAdapter.isInitialized) browserAdapter.refreshMarks()
     }
@@ -65,6 +73,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun buildScreen() {
+        // Use a two-pane landscape layout because the app is controlled from a TV remote;
+        // a persistent navigation column avoids hiding the primary actions in touch menus.
         val padding = (resources.displayMetrics.density * 24).toInt()
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -158,6 +168,8 @@ class MainActivity : ComponentActivity() {
         content.addView(browserUpButton, menuButtonParams())
         videoAdapter = VideoAdapter()
         videos = ListView(this).apply {
+            // ListView recycles row views. Building a Button for every media item at once
+            // made large network shares slow to open and could stall the TV's UI thread.
             adapter = videoAdapter
             isFocusable = true
             isFocusableInTouchMode = true
@@ -320,6 +332,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showVideoList() {
+        // Switching modes hides the other surface instead of rebuilding it, so returning
+        // from browsing does not discard the loaded list or its remote-control selection.
         browserList.visibility = View.GONE
         browserUpButton.visibility = View.GONE
         videoListHeader.visibility = View.VISIBLE
@@ -337,6 +351,9 @@ class MainActivity : ComponentActivity() {
         }
         browserSource = source
         browserPath.clear()
+        // SMB paths and UPnP object IDs both form a parent stack, although they are
+        // represented differently by their protocols. Keeping the stack in the UI lets
+        // the same Back/parent action work for both source types.
         val root = when (source) {
             is RecentSource.Smb -> source.address.let { if (it.endsWith('/')) it else "$it/" }
             is RecentSource.Upnp -> "0"
@@ -363,6 +380,8 @@ class MainActivity : ComponentActivity() {
         browserUpButton.isEnabled = browserPath.size > 1
         status.text = getString(R.string.status_browsing)
         browserAdapter.replaceItems(emptyList())
+        // Keep focus on the browser while the newly selected directory is fetched; an
+        // empty transient adapter must not send the D-pad focus back to the side menu.
         browserList.requestFocus()
         executor.execute {
             val result = runCatching {
@@ -383,6 +402,8 @@ class MainActivity : ComponentActivity() {
                 result.onSuccess { items ->
                     browserAdapter.replaceItems(items)
                     status.text = getString(R.string.status_browser_items, items.size)
+                    // ListView owns D-pad row selection, so explicitly restore it after
+                    // replacing the adapter data rather than focusing a recycled child.
                     browserList.requestFocus()
                     if (items.isNotEmpty()) browserList.setSelection(0)
                 }.onFailure {
@@ -531,8 +552,12 @@ class MainActivity : ComponentActivity() {
         }
         refreshVideos = cachingLoader
         status.text = loadingMessage
+        // Refresh/source scans clear rows before loading so stale entries are not mistaken
+        // for the result of the current scan; foreground returns do not call this method.
         videoAdapter.replaceItems(emptyList())
         executor.execute {
+            // Sorting can be substantial for a large share, so do it beside the network
+            // load rather than on the main thread after the response arrives.
             val result = runCatching {
                 cachingLoader().let { items -> items to sortVideos(items, selectedVideoSortOrder()) }
             }
@@ -549,6 +574,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showVideos(items: List<RemoteVideo>, sortedItems: List<RemoteVideo>) {
+        // Preserve the unsorted source data so changing the sort preference can derive a
+        // fresh order without making today's display order the next input ordering.
         currentVideos = items
         if (items.isEmpty()) {
             videoAdapter.replaceItems(emptyList())
@@ -560,6 +587,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun sortVideos(items: List<RemoteVideo>, sortOrder: VideoSortOrder): List<RemoteVideo> {
+        // UPnP titles are often episode labels rather than filenames, so filename sorting
+        // uses the resource URI's last path segment when a server provides one.
         val fileNameComparator = Comparator<RemoteVideo> { first, second ->
             first.fileNameSortKey().compareTo(second.fileNameSortKey(), ignoreCase = true)
         }
@@ -594,6 +623,8 @@ class MainActivity : ComponentActivity() {
             notifyDataSetChanged()
         }
 
+        // Marks are preferences, not adapter data, and can change while PlayerActivity is
+        // on top. Rebind visible rows without replacing the current list.
         fun refreshMarks() = notifyDataSetChanged()
 
         override fun getCount(): Int = items.size
@@ -654,6 +685,8 @@ class MainActivity : ComponentActivity() {
         val completed = preferences.getBoolean("completed:${item.uri}", false)
         val position = preferences.getLong("position:${item.uri}", 0L)
         val watched = preferences.getBoolean("watched:${item.uri}", false)
+        // Completion is the strongest state; otherwise a saved position is more useful
+        // than the generic watched check because it tells the viewer where resume starts.
         return when {
             completed -> getString(R.string.video_mark_completed, item.title)
             position > 0L -> getString(R.string.video_mark_position, item.title, formatPosition(position))
@@ -689,6 +722,8 @@ class MainActivity : ComponentActivity() {
         select: Boolean = true,
         isStartupRestore: Boolean = false
     ) {
+        // Selecting a source updates the default used by both startup restoration and the
+        // browser menu; startup restoration deliberately leaves that choice untouched.
         if (select) RecentSourceStore.select(this, source)
         val loader: (() -> List<RemoteVideo>)? = when (source) {
             is RecentSource.Smb -> SmbCredentialsStore.credentialsFor(this, source.address)?.let {
@@ -714,6 +749,8 @@ class MainActivity : ComponentActivity() {
         videoAdapter.replaceItems(emptyList())
         if (isStartupRestore) beginStartupRestore()
         executor.execute {
+            // Cached results appear before any network request, which keeps a slow server
+            // from making startup feel like the app has lost its previous library.
             val cachedVideos = runCatching {
                 VideoCacheStore.load(this, source.cacheKey)?.let { items ->
                     items to sortVideos(items, selectedVideoSortOrder())
@@ -759,6 +796,8 @@ class MainActivity : ComponentActivity() {
         button.iconTint = getColorStateList(R.color.edeck_button_text)
         button.backgroundTintList = ColorStateList.valueOf(getColor(R.color.edeck_surface_container_high))
         button.setOnFocusChangeListener { _, focused ->
+            // TV remotes have no hover state, so focus needs a strong surface and contrast
+            // change to remain visible from couch distance.
             button.backgroundTintList = ColorStateList.valueOf(
                 if (focused) getColor(R.color.edeck_primary_container)
                 else getColor(R.color.edeck_surface_container_high)
@@ -773,6 +812,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        // Interrupt queued/interruptible scans and release the worker when this screen is
+        // gone rather than keeping an executor alive for the Activity's whole process.
         executor.shutdownNow()
         super.onDestroy()
     }

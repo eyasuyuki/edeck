@@ -13,6 +13,8 @@ import org.junit.runner.RunWith
 class SmbCredentialsStoreTest {
     @Test
     fun playbackCanResolveShareCredentialsFromVideoFileUri() {
+        // Playback knows the media-file URI, while the user saved credentials for the
+        // share root; ensure lookup bridges those addresses without leaking to another share.
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val suffix = System.currentTimeMillis()
         val shareUri = "smb://credentials-test-$suffix.local/Media"
@@ -38,6 +40,8 @@ class SmbCredentialsStoreTest {
 
     @Test
     fun credentialsForMultipleSavedSharesAreResolvedByMostSpecificRoot() {
+        // A nested share may intentionally use another account, so the narrowest matching
+        // root must win even when a broader parent share was saved first.
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val suffix = System.currentTimeMillis()
         val host = "multi-$suffix.local"

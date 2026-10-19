@@ -27,6 +27,8 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("androidx.media3:media3-exoplayer:1.6.1")
     implementation("androidx.media3:media3-ui:1.6.1")
+    // The app uses classic Views, so Material Components supplies the Material 3 theme,
+    // buttons, and dialogs without requiring a Compose migration.
     implementation("com.google.android.material:material:1.14.0")
     implementation("eu.agno3.jcifs:jcifs-ng:2.1.10")
     androidTestImplementation("androidx.test:runner:1.6.2")

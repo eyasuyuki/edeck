@@ -16,6 +16,8 @@ internal class RetryingInputStream(
 
     @Throws(IOException::class)
     fun read(buffer: ByteArray, offset: Int, length: Int, retryOnUnexpectedEof: Boolean = false): Int {
+        // `position` advances only after bytes have been delivered. Reopening there avoids
+        // both gaps and duplicate bytes when the remote server drops a stream mid-read.
         var retries = 0
         while (true) {
             try {
@@ -25,6 +27,8 @@ internal class RetryingInputStream(
                 }
                 val count = stream!!.read(buffer, offset, length)
                 if (count > 0) position += count
+                // EOF is normal for unknown-length responses. With a known file length it
+                // instead signals a truncated SMB transfer and should consume a retry.
                 if (count >= 0 || !retryOnUnexpectedEof) return count
                 throw IOException("Unexpected end of SMB stream")
             } catch (error: IOException) {
@@ -32,6 +36,8 @@ internal class RetryingInputStream(
                 retries++
                 discardCurrentStream()
             } catch (interrupted: InterruptedException) {
+                // Preserve cancellation from the player/activity worker instead of turning
+                // it into another network retry after the caller asked this thread to stop.
                 Thread.currentThread().interrupt()
                 throw IOException("Interrupted while reconnecting to the SMB share", interrupted)
             }
