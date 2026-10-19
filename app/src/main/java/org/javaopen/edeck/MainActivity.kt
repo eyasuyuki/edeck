@@ -351,15 +351,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun sortVideos(items: List<RemoteVideo>, sortOrder: VideoSortOrder): List<RemoteVideo> = when (sortOrder) {
-        VideoSortOrder.FILE_NAME_ASC -> items.sortedWith(
-            compareBy(String.CASE_INSENSITIVE_ORDER) { it.fileNameSortKey() }
-        )
-        VideoSortOrder.FILE_NAME_DESC -> items.sortedWith(
-            compareBy(String.CASE_INSENSITIVE_ORDER) { it.fileNameSortKey() }.reversed()
-        )
-        VideoSortOrder.MODIFIED_ASC -> items.sortedBy(RemoteVideo::lastModified)
-        VideoSortOrder.MODIFIED_DESC -> items.sortedByDescending(RemoteVideo::lastModified)
+    private fun sortVideos(items: List<RemoteVideo>, sortOrder: VideoSortOrder): List<RemoteVideo> {
+        val fileNameComparator = Comparator<RemoteVideo> { first, second ->
+            first.fileNameSortKey().compareTo(second.fileNameSortKey(), ignoreCase = true)
+        }
+        return when (sortOrder) {
+            VideoSortOrder.FILE_NAME_ASC -> items.sortedWith(fileNameComparator)
+            VideoSortOrder.FILE_NAME_DESC -> items.sortedWith(fileNameComparator.reversed())
+            VideoSortOrder.MODIFIED_ASC -> items.sortedBy(RemoteVideo::lastModified)
+            VideoSortOrder.MODIFIED_DESC -> items.sortedByDescending(RemoteVideo::lastModified)
+        }
     }
 
     private fun RemoteVideo.fileNameSortKey(): String =
