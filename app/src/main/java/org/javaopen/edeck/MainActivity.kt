@@ -7,7 +7,6 @@ import android.graphics.Rect
 import android.text.InputType
 import android.text.method.TransformationMethod
 import android.view.Gravity
-import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -47,6 +46,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (::videoAdapter.isInitialized) videoAdapter.refreshMarks()
     }
 
     override fun onPause() {
@@ -106,6 +106,8 @@ class MainActivity : ComponentActivity() {
             adapter = videoAdapter
             isFocusable = true
             isFocusableInTouchMode = true
+            itemsCanFocus = false
+            setOnItemClickListener { _, _, position, _ -> playVideo(videoAdapter.getItem(position)) }
         }
         content.addView(videos, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
@@ -430,6 +432,8 @@ class MainActivity : ComponentActivity() {
             notifyDataSetChanged()
         }
 
+        fun refreshMarks() = notifyDataSetChanged()
+
         override fun getCount(): Int = items.size
 
         override fun getItem(position: Int): RemoteVideo = items[position]
@@ -438,14 +442,17 @@ class MainActivity : ComponentActivity() {
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val item = getItem(position)
-            val button = (convertView as? Button) ?: Button(this@MainActivity).apply {
+            val row = (convertView as? TextView) ?: TextView(this@MainActivity).apply {
                 textSize = 18f
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                styleRemoteButton(this)
+                setPadding(dp(16), dp(12), dp(16), dp(12))
+                minHeight = dp(56)
+                isFocusable = false
+                isClickable = false
             }
             val watched = preferences.getBoolean("watched:${item.uri}", false)
             val completed = preferences.getBoolean("completed:${item.uri}", false)
-            button.text = getString(
+            row.text = getString(
                 when {
                     completed -> R.string.video_mark_completed
                     watched -> R.string.video_mark_watched
@@ -453,14 +460,15 @@ class MainActivity : ComponentActivity() {
                 },
                 item.title
             )
-            button.setOnClickListener {
-                startActivity(Intent(this@MainActivity, PlayerActivity::class.java).apply {
-                    putExtra(PlayerActivity.EXTRA_URI, item.uri.toString())
-                    putExtra(PlayerActivity.EXTRA_TITLE, item.title)
-                })
-            }
-            return button
+            return row
         }
+    }
+
+    private fun playVideo(item: RemoteVideo) {
+        startActivity(Intent(this, PlayerActivity::class.java).apply {
+            putExtra(PlayerActivity.EXTRA_URI, item.uri.toString())
+            putExtra(PlayerActivity.EXTRA_TITLE, item.title)
+        })
     }
 
     private fun restoreRecentSource() {
@@ -541,28 +549,6 @@ class MainActivity : ComponentActivity() {
             view.scaleX = if (focused) 1.04f else 1f
             view.scaleY = if (focused) 1.04f else 1f
         }
-    }
-
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN) {
-            when (event.keyCode) {
-                KeyEvent.KEYCODE_DPAD_UP -> return moveFocus(View.FOCUS_UP)
-                KeyEvent.KEYCODE_DPAD_DOWN -> return moveFocus(View.FOCUS_DOWN)
-                KeyEvent.KEYCODE_DPAD_LEFT -> return moveFocus(View.FOCUS_LEFT)
-                KeyEvent.KEYCODE_DPAD_RIGHT -> return moveFocus(View.FOCUS_RIGHT)
-                KeyEvent.KEYCODE_DPAD_CENTER,
-                KeyEvent.KEYCODE_ENTER,
-                KeyEvent.KEYCODE_NUMPAD_ENTER -> {
-                    if (event.repeatCount == 0 && window.currentFocus?.performClick() == true) return true
-                }
-            }
-        }
-        return super.dispatchKeyEvent(event)
-    }
-
-    private fun moveFocus(direction: Int): Boolean {
-        val current = window.currentFocus ?: return false
-        return current.focusSearch(direction)?.requestFocus() ?: false
     }
 
     override fun onDestroy() {
