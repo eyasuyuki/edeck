@@ -27,6 +27,9 @@
     <string name="network_error">ネットワークエラー</string>
     <string name="status_no_videos">対応動画が見つかりませんでした</string>
     <string name="status_videos_found">%1$d 件の動画（更新日時の新しい順）</string>
+    <string name="video_mark_unwatched">▶  %1$s</string>
+    <string name="video_mark_watched">✓  %1$s</string>
+    <string name="video_mark_completed">★  %1$s</string>
     <string name="status_open_source_first">先にUPnPサーバーまたはSMB共有を開いてください</string>
     <string name="status_refreshing">一覧を更新中…</string>
     <string name="error_upnp_search">UPnP検索に失敗しました: %1$s</string>

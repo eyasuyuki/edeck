@@ -84,9 +84,23 @@ class PlayerActivity : Activity() {
             })
             exo.setMediaItem(MediaItem.fromUri(Uri.parse(mediaUri)))
             exo.prepare()
-            exo.seekTo(preferences.getLong(positionKey(), 0L))
+            val startPosition = if (preferences.getBoolean(completedKey(), false)) {
+                0L
+            } else {
+                preferences.getLong(positionKey(), 0L)
+            }
+            exo.seekTo(startPosition)
             exo.playWhenReady = true
             exo.addListener(object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_ENDED) {
+                        preferences.edit()
+                            .putBoolean(completedKey(), true)
+                            .putLong(positionKey(), 0L)
+                            .apply()
+                    }
+                }
+
                 override fun onPlayerError(error: PlaybackException) {
                     Toast.makeText(
                         this@PlayerActivity,
@@ -131,7 +145,9 @@ class PlayerActivity : Activity() {
 
     private fun savePosition() {
         player?.let { exo ->
-            if (exo.currentPosition > 0L) {
+            if (exo.playbackState == Player.STATE_ENDED) {
+                preferences.edit().putLong(positionKey(), 0L).apply()
+            } else if (exo.currentPosition > 0L) {
                 preferences.edit().putLong(positionKey(), exo.currentPosition).apply()
                 preferences.edit().putBoolean(watchedKey(), true).apply()
             }
@@ -148,6 +164,7 @@ class PlayerActivity : Activity() {
 
     private fun positionKey() = "position:$mediaUri"
     private fun watchedKey() = "watched:$mediaUri"
+    private fun completedKey() = "completed:$mediaUri"
 
     companion object {
         private const val MIN_BUFFER_MS = 60_000

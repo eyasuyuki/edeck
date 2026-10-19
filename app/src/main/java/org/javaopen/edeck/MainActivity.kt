@@ -291,8 +291,16 @@ class MainActivity : ComponentActivity() {
         status.text = getString(R.string.status_videos_found, items.size)
         items.forEach { item ->
             val watched = preferences.getBoolean("watched:${item.uri}", false)
+            val completed = preferences.getBoolean("completed:${item.uri}", false)
             val button = Button(this).apply {
-                text = (if (watched) "✓  " else "▶  ") + item.title
+                text = getString(
+                    when {
+                        completed -> R.string.video_mark_completed
+                        watched -> R.string.video_mark_watched
+                        else -> R.string.video_mark_unwatched
+                    },
+                    item.title
+                )
                 textSize = 18f
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
                 setOnClickListener {

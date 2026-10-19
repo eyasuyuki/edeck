@@ -27,6 +27,9 @@
     <string name="network_error">Network error</string>
     <string name="status_no_videos">No supported videos found.</string>
     <string name="status_videos_found">%1$d video(s), sorted by newest first</string>
+    <string name="video_mark_unwatched">▶  %1$s</string>
+    <string name="video_mark_watched">✓  %1$s</string>
+    <string name="video_mark_completed">★  %1$s</string>
     <string name="status_open_source_first">Open a UPnP server or SMB share first.</string>
     <string name="status_refreshing">Refreshing list…</string>
     <string name="error_upnp_search">UPnP search failed: %1$s</string>
