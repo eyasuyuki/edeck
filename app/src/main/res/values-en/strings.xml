@@ -26,7 +26,12 @@
     <string name="error_load">Could not load: %1$s</string>
     <string name="network_error">Network error</string>
     <string name="status_no_videos">No supported videos found.</string>
-    <string name="status_videos_found">%1$d video(s), sorted by newest first</string>
+    <string name="status_videos_found">%1$d video(s)</string>
+    <string name="settings_video_sort_order">Video list order</string>
+    <string name="sort_file_name_ascending">File name, ascending</string>
+    <string name="sort_file_name_descending">File name, descending</string>
+    <string name="sort_modified_ascending">File modified date, ascending</string>
+    <string name="sort_modified_descending">File modified date, descending</string>
     <string name="video_mark_unwatched">▶  %1$s</string>
     <string name="video_mark_watched">✓  %1$s</string>
     <string name="video_mark_completed">★  %1$s</string>

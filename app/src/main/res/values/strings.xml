@@ -26,7 +26,12 @@
     <string name="error_load">読み込みに失敗しました: %1$s</string>
     <string name="network_error">ネットワークエラー</string>
     <string name="status_no_videos">対応動画が見つかりませんでした</string>
-    <string name="status_videos_found">%1$d 件の動画（更新日時の新しい順）</string>
+    <string name="status_videos_found">%1$d 件の動画</string>
+    <string name="settings_video_sort_order">一覧の表示順</string>
+    <string name="sort_file_name_ascending">ファイル名の昇順</string>
+    <string name="sort_file_name_descending">ファイル名の降順</string>
+    <string name="sort_modified_ascending">ファイル更新日の昇順</string>
+    <string name="sort_modified_descending">ファイル更新日の降順</string>
     <string name="video_mark_unwatched">▶  %1$s</string>
     <string name="video_mark_watched">✓  %1$s</string>
     <string name="video_mark_completed">★  %1$s</string>

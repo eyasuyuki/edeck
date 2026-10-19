@@ -27,6 +27,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var settingsButton: Button
     private val preferences by lazy { getSharedPreferences("playback", MODE_PRIVATE) }
     private var refreshVideos: (() -> List<RemoteVideo>)? = null
+    private var currentVideos: List<RemoteVideo> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -113,17 +114,40 @@ class MainActivity : ComponentActivity() {
             .setItems(arrayOf(
                 getString(R.string.settings_saved_sources),
                 getString(R.string.settings_upnp),
-                getString(R.string.settings_smb)
+                getString(R.string.settings_smb),
+                getString(R.string.settings_video_sort_order)
             )) { _, choice ->
                 when (choice) {
                     0 -> showSavedSourcesDialog()
                     1 -> discoverUpnpServers()
                     2 -> showSmbDialog()
+                    3 -> showVideoSortOrderDialog()
                 }
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
+
+    private fun showVideoSortOrderDialog() {
+        val sortOrders = VideoSortOrder.values()
+        val selectedSortOrder = selectedVideoSortOrder()
+        android.app.AlertDialog.Builder(this)
+            .setTitle(R.string.settings_video_sort_order)
+            .setSingleChoiceItems(
+                sortOrders.map { getString(it.labelResource) }.toTypedArray(),
+                sortOrders.indexOf(selectedSortOrder)
+            ) { dialog, index ->
+                preferences.edit().putString(VIDEO_SORT_ORDER_KEY, sortOrders[index].name).apply()
+                if (currentVideos.isNotEmpty()) showVideos(currentVideos)
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun selectedVideoSortOrder(): VideoSortOrder = runCatching {
+        VideoSortOrder.valueOf(preferences.getString(VIDEO_SORT_ORDER_KEY, null) ?: "")
+    }.getOrDefault(VideoSortOrder.MODIFIED_DESC)
 
     private fun showSavedSourcesDialog() {
         val sources = RecentSourceStore.sources(this)
@@ -294,13 +318,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showVideos(items: List<RemoteVideo>) {
+        currentVideos = items
         videos.removeAllViews()
         if (items.isEmpty()) {
             status.text = getString(R.string.status_no_videos)
             return
         }
         status.text = getString(R.string.status_videos_found, items.size)
-        items.forEach { item ->
+        sortVideos(items, selectedVideoSortOrder()).forEach { item ->
             val watched = preferences.getBoolean("watched:${item.uri}", false)
             val completed = preferences.getBoolean("completed:${item.uri}", false)
             val button = Button(this).apply {
@@ -324,6 +349,31 @@ class MainActivity : ComponentActivity() {
             styleRemoteButton(button)
             videos.addView(button)
         }
+    }
+
+    private fun sortVideos(items: List<RemoteVideo>, sortOrder: VideoSortOrder): List<RemoteVideo> = when (sortOrder) {
+        VideoSortOrder.FILE_NAME_ASC -> items.sortedWith(
+            compareBy(String.CASE_INSENSITIVE_ORDER) { it.fileNameSortKey() }
+        )
+        VideoSortOrder.FILE_NAME_DESC -> items.sortedWith(
+            compareBy(String.CASE_INSENSITIVE_ORDER) { it.fileNameSortKey() }.reversed()
+        )
+        VideoSortOrder.MODIFIED_ASC -> items.sortedBy(RemoteVideo::lastModified)
+        VideoSortOrder.MODIFIED_DESC -> items.sortedByDescending(RemoteVideo::lastModified)
+    }
+
+    private fun RemoteVideo.fileNameSortKey(): String =
+        uri.lastPathSegment?.takeIf(String::isNotBlank) ?: title
+
+    private enum class VideoSortOrder(val labelResource: Int) {
+        FILE_NAME_ASC(R.string.sort_file_name_ascending),
+        FILE_NAME_DESC(R.string.sort_file_name_descending),
+        MODIFIED_ASC(R.string.sort_modified_ascending),
+        MODIFIED_DESC(R.string.sort_modified_descending)
+    }
+
+    companion object {
+        private const val VIDEO_SORT_ORDER_KEY = "video_sort_order"
     }
 
     private fun restoreRecentSource() {
