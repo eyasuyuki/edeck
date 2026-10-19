@@ -41,6 +41,7 @@ class PlayerActivity : Activity() {
         )
         setContentView(playerView)
         playerView.setControllerShowTimeoutMs(CONTROLLER_SHOW_TIMEOUT_MS)
+        val hideControllerRunnable = Runnable { playerView.hideController() }
         val isSmb = Uri.parse(mediaUri).scheme.equals("smb", ignoreCase = true)
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
@@ -73,7 +74,12 @@ class PlayerActivity : Activity() {
             exo.addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     setKeepScreenOn(isPlaying)
-                    if (isPlaying) preferences.edit().putBoolean(watchedKey(), true).apply()
+                    playerView.removeCallbacks(hideControllerRunnable)
+                    if (isPlaying) {
+                        preferences.edit().putBoolean(watchedKey(), true).apply()
+                        // 復帰シーク後に準備中表示が残っても、再生開始から2秒で閉じる。
+                        playerView.postDelayed(hideControllerRunnable, CONTROLLER_SHOW_TIMEOUT_MS.toLong())
+                    }
                 }
             })
             exo.setMediaItem(MediaItem.fromUri(Uri.parse(mediaUri)))
