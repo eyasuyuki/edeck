@@ -11,15 +11,15 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.ImageButton
 import android.widget.BaseAdapter
-import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.util.concurrent.Executors
 
 class MainActivity : ComponentActivity() {
@@ -29,12 +29,12 @@ class MainActivity : ComponentActivity() {
     private lateinit var videoAdapter: VideoAdapter
     private lateinit var browserList: ListView
     private lateinit var browserAdapter: BrowserAdapter
-    private lateinit var browserUpButton: Button
+    private lateinit var browserUpButton: MaterialButton
     private lateinit var videoListHeader: View
-    private lateinit var listButton: Button
-    private lateinit var browseButton: Button
-    private lateinit var refreshButton: ImageButton
-    private lateinit var settingsButton: Button
+    private lateinit var listButton: MaterialButton
+    private lateinit var browseButton: MaterialButton
+    private lateinit var refreshButton: MaterialButton
+    private lateinit var settingsButton: MaterialButton
     private lateinit var startupBanner: View
     private val preferences by lazy { getSharedPreferences("playback", MODE_PRIVATE) }
     private var refreshVideos: (() -> List<RemoteVideo>)? = null
@@ -69,41 +69,52 @@ class MainActivity : ComponentActivity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(padding, padding, padding, padding)
+            setBackgroundColor(getColor(R.color.edeck_background))
         }
         val menu = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 0, padding, 0)
-            backgroundTintList = ColorStateList.valueOf(android.graphics.Color.rgb(32, 36, 42))
+            setPadding(dp(12), dp(16), dp(12), dp(16))
+            setBackgroundColor(getColor(R.color.edeck_surface_container))
         }
         menu.addView(TextView(this).apply {
             text = getString(R.string.app_name)
-            textSize = 26f
-            setPadding(0, 0, 0, padding)
+            textSize = 28f
+            setTextColor(getColor(R.color.edeck_primary))
+            setPadding(dp(12), 0, 0, dp(24))
         })
-        refreshButton = ImageButton(this).apply {
-            setImageResource(android.R.drawable.ic_popup_sync)
+        refreshButton = MaterialButton(this).apply {
+            text = ""
             contentDescription = getString(R.string.action_refresh)
-            setPadding(dp(12), dp(12), dp(12), dp(12))
-            backgroundTintList = ColorStateList.valueOf(android.graphics.Color.rgb(80, 80, 80))
+            icon = getDrawable(R.drawable.ic_refresh_24)
+            iconSize = dp(24)
+            iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+            insetTop = 0
+            insetBottom = 0
             setOnClickListener { refreshSource() }
         }
         styleRemoteButton(refreshButton)
-        listButton = Button(this).apply {
+        listButton = MaterialButton(this).apply {
             text = getString(R.string.action_video_list)
             contentDescription = text
+            icon = getDrawable(R.drawable.ic_video_list_24)
+            iconSize = dp(22)
             setOnClickListener { showVideoList() }
         }
         styleRemoteButton(listButton)
         menu.addView(listButton, menuButtonParams())
-        browseButton = Button(this).apply {
+        browseButton = MaterialButton(this).apply {
             text = getString(R.string.action_browse)
             contentDescription = text
+            icon = getDrawable(R.drawable.ic_folder_open_24)
+            iconSize = dp(22)
             setOnClickListener { openBrowser() }
         }
         styleRemoteButton(browseButton)
-        settingsButton = Button(this).apply {
+        settingsButton = MaterialButton(this).apply {
             text = getString(R.string.action_settings)
             contentDescription = getString(R.string.action_settings)
+            icon = getDrawable(R.drawable.ic_settings_24)
+            iconSize = dp(22)
             setOnClickListener { showSettingsDialog() }
         }
         styleRemoteButton(settingsButton)
@@ -117,17 +128,29 @@ class MainActivity : ComponentActivity() {
         }
         content.addView(TextView(this).apply {
             text = getString(R.string.home_description)
-            textSize = 18f
-            setPadding(0, 0, 0, padding / 3)
+            textSize = 15f
+            setTextColor(getColor(R.color.edeck_on_surface_variant))
+            setPadding(dp(8), dp(8), 0, dp(8))
         })
         status = TextView(this).apply {
             text = getString(R.string.status_choose_source)
             textSize = 16f
-            setPadding(0, padding / 3, 0, padding / 3)
+            setTextColor(getColor(R.color.edeck_on_surface))
+            setPadding(dp(16), dp(14), dp(16), dp(14))
         }
-        content.addView(status)
-        browserUpButton = Button(this).apply {
+        val statusCard = com.google.android.material.card.MaterialCardView(this).apply {
+            radius = dp(16).toFloat()
+            cardElevation = 0f
+            setCardBackgroundColor(getColor(R.color.edeck_surface_container_high))
+            addView(status)
+        }
+        content.addView(statusCard, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(12) })
+        browserUpButton = MaterialButton(this).apply {
             text = getString(R.string.action_parent_directory)
+            icon = getDrawable(R.drawable.ic_arrow_up_24)
+            iconSize = dp(20)
             setOnClickListener { navigateBrowserUp() }
             visibility = View.GONE
         }
@@ -139,6 +162,8 @@ class MainActivity : ComponentActivity() {
             isFocusable = true
             isFocusableInTouchMode = true
             itemsCanFocus = false
+            divider = android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT)
+            dividerHeight = dp(8)
             setOnItemClickListener { _, _, position, _ -> playVideo(videoAdapter.getItem(position)) }
         }
         videoListHeader = LinearLayout(this).apply {
@@ -158,6 +183,8 @@ class MainActivity : ComponentActivity() {
             isFocusable = true
             isFocusableInTouchMode = true
             itemsCanFocus = false
+            divider = android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT)
+            dividerHeight = dp(8)
             visibility = View.GONE
             setOnItemClickListener { _, _, position, _ ->
                 val item = browserAdapter.getItem(position)
@@ -178,12 +205,12 @@ class MainActivity : ComponentActivity() {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setPadding(padding * 2, padding * 2, padding * 2, padding * 2)
-            setBackgroundColor(android.graphics.Color.rgb(25, 31, 40))
+            setBackgroundColor(getColor(R.color.edeck_background))
             visibility = View.GONE
             addView(TextView(this@MainActivity).apply {
                 text = getString(R.string.app_name)
                 textSize = 42f
-                setTextColor(android.graphics.Color.WHITE)
+                setTextColor(getColor(R.color.edeck_primary))
                 gravity = Gravity.CENTER
             })
             addView(ProgressBar(this@MainActivity).apply {
@@ -196,7 +223,7 @@ class MainActivity : ComponentActivity() {
             addView(TextView(this@MainActivity).apply {
                 text = getString(R.string.status_cache_loading)
                 textSize = 18f
-                setTextColor(android.graphics.Color.WHITE)
+                setTextColor(getColor(R.color.edeck_on_surface))
                 gravity = Gravity.CENTER
             })
         }
@@ -233,7 +260,7 @@ class MainActivity : ComponentActivity() {
     private fun dp(value: Int) = (resources.displayMetrics.density * value).toInt()
 
     private fun showSettingsDialog() {
-        android.app.AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.action_settings)
             .setItems(arrayOf(
                 getString(R.string.settings_saved_sources),
@@ -255,7 +282,7 @@ class MainActivity : ComponentActivity() {
     private fun showVideoSortOrderDialog() {
         val sortOrders = VideoSortOrder.values()
         val selectedSortOrder = selectedVideoSortOrder()
-        android.app.AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.settings_video_sort_order)
             .setSingleChoiceItems(
                 sortOrders.map { getString(it.labelResource) }.toTypedArray(),
@@ -276,14 +303,14 @@ class MainActivity : ComponentActivity() {
     private fun showSavedSourcesDialog() {
         val sources = RecentSourceStore.sources(this)
         if (sources.isEmpty()) {
-            android.app.AlertDialog.Builder(this)
+            MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.settings_saved_sources)
                 .setMessage(R.string.status_no_saved_sources)
                 .setPositiveButton(android.R.string.ok, null)
                 .show()
             return
         }
-        android.app.AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.settings_saved_sources)
             .setItems(sources.map(RecentSource::label).toTypedArray()) { _, index ->
                 activateSource(sources[index])
@@ -377,7 +404,7 @@ class MainActivity : ComponentActivity() {
                     } else {
                         status.text = getString(R.string.status_upnp_found, servers.size)
                         val names = servers.map { it.name }.toTypedArray()
-                        android.app.AlertDialog.Builder(this)
+                        MaterialAlertDialogBuilder(this)
                             .setTitle(R.string.title_upnp_servers)
                             .setItems(names) { _, index ->
                                 val server = servers[index]
@@ -426,7 +453,7 @@ class MainActivity : ComponentActivity() {
         val passwordRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         password.transformationMethod = AsteriskPasswordTransformationMethod
         passwordRow.addView(password, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        val passwordVisibility = Button(this).apply {
+        val passwordVisibility = MaterialButton(this).apply {
             text = getString(R.string.password_show)
             contentDescription = getString(R.string.password_show)
             setOnClickListener {
@@ -467,7 +494,7 @@ class MainActivity : ComponentActivity() {
             username.setText(saved.username)
             password.setText(saved.password)
         }
-        android.app.AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.title_connect_smb)
             .setMessage(R.string.message_connect_smb)
             .setView(fields)
@@ -578,12 +605,14 @@ class MainActivity : ComponentActivity() {
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val item = getItem(position)
             val row = (convertView as? TextView) ?: TextView(this@MainActivity).apply {
-                textSize = 18f
+                textSize = 20f
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                setPadding(dp(16), dp(12), dp(16), dp(12))
-                minHeight = dp(56)
+                setPadding(dp(20), dp(14), dp(20), dp(14))
+                minHeight = dp(68)
                 isFocusable = false
                 isClickable = false
+                setTextColor(getColor(R.color.edeck_on_surface))
+                setBackgroundResource(R.drawable.list_row_background)
             }
             row.text = videoLabel(item)
             return row
@@ -605,12 +634,14 @@ class MainActivity : ComponentActivity() {
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val row = (convertView as? TextView) ?: TextView(this@MainActivity).apply {
-                textSize = 18f
+                textSize = 20f
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                setPadding(dp(16), dp(12), dp(16), dp(12))
-                minHeight = dp(56)
+                setPadding(dp(20), dp(14), dp(20), dp(14))
+                minHeight = dp(68)
                 isFocusable = false
                 isClickable = false
+                setTextColor(getColor(R.color.edeck_on_surface))
+                setBackgroundResource(R.drawable.list_row_background)
             }
             val item = getItem(position)
             row.text = item.directoryId?.let { getString(R.string.browser_folder, item.title) }
@@ -716,14 +747,28 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun styleRemoteButton(button: View) {
-        button.setOnFocusChangeListener { view, focused ->
-            view.backgroundTintList = ColorStateList.valueOf(
-                if (focused) android.graphics.Color.rgb(21, 101, 192)
-                else android.graphics.Color.rgb(80, 80, 80)
+    private fun styleRemoteButton(button: MaterialButton) {
+        button.isAllCaps = false
+        button.textSize = 16f
+        button.cornerRadius = dp(14)
+        button.insetTop = dp(3)
+        button.insetBottom = dp(3)
+        button.iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+        button.iconPadding = dp(12)
+        button.setTextColor(getColorStateList(R.color.edeck_button_text))
+        button.iconTint = getColorStateList(R.color.edeck_button_text)
+        button.backgroundTintList = ColorStateList.valueOf(getColor(R.color.edeck_surface_container_high))
+        button.setOnFocusChangeListener { _, focused ->
+            button.backgroundTintList = ColorStateList.valueOf(
+                if (focused) getColor(R.color.edeck_primary_container)
+                else getColor(R.color.edeck_surface_container_high)
             )
-            view.scaleX = if (focused) 1.04f else 1f
-            view.scaleY = if (focused) 1.04f else 1f
+            button.setTextColor(getColor(if (focused) R.color.edeck_on_primary_container else R.color.edeck_on_surface))
+            button.iconTint = ColorStateList.valueOf(
+                getColor(if (focused) R.color.edeck_on_primary_container else R.color.edeck_on_surface)
+            )
+            button.scaleX = if (focused) 1.03f else 1f
+            button.scaleY = if (focused) 1.03f else 1f
         }
     }
 

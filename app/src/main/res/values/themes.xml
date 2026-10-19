@@ -1,0 +1,21 @@
+<resources>
+    <style name="Theme.EDeck" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/edeck_primary</item>
+        <item name="colorOnPrimary">@color/edeck_on_primary</item>
+        <item name="colorPrimaryContainer">@color/edeck_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/edeck_on_primary_container</item>
+        <item name="colorSecondary">@color/edeck_secondary</item>
+        <item name="colorOnSecondary">@color/edeck_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/edeck_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/edeck_on_secondary_container</item>
+        <item name="colorTertiary">@color/edeck_tertiary</item>
+        <item name="colorSurface">@color/edeck_surface</item>
+        <item name="colorOnSurface">@color/edeck_on_surface</item>
+        <item name="colorSurfaceVariant">@color/edeck_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/edeck_on_surface_variant</item>
+        <item name="colorOutline">@color/edeck_outline</item>
+        <item name="android:colorAccent">@color/edeck_primary</item>
+        <item name="android:windowBackground">@color/edeck_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

@@ -27,6 +27,7 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("androidx.media3:media3-exoplayer:1.6.1")
     implementation("androidx.media3:media3-ui:1.6.1")
+    implementation("com.google.android.material:material:1.14.0")
     implementation("eu.agno3.jcifs:jcifs-ng:2.1.10")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

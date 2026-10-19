@@ -1,0 +1,22 @@
+<resources>
+    <color name="edeck_primary">#B8C4FF</color>
+    <color name="edeck_on_primary">#18264F</color>
+    <color name="edeck_primary_container">#303F72</color>
+    <color name="edeck_on_primary_container">#DCE1FF</color>
+    <color name="edeck_secondary">#C2C6DD</color>
+    <color name="edeck_on_secondary">#2B3042</color>
+    <color name="edeck_secondary_container">#41465A</color>
+    <color name="edeck_on_secondary_container">#DEE1F9</color>
+    <color name="edeck_tertiary">#E6BBDD</color>
+    <color name="edeck_on_tertiary">#43263F</color>
+    <color name="edeck_surface">#111318</color>
+    <color name="edeck_on_surface">#E2E2E9</color>
+    <color name="edeck_surface_variant">#45464F</color>
+    <color name="edeck_on_surface_variant">#C5C6D0</color>
+    <color name="edeck_outline">#8F9099</color>
+    <color name="edeck_background">#111318</color>
+    <color name="edeck_row">#1C1B20</color>
+    <color name="edeck_row_focus">#303F72</color>
+    <color name="edeck_surface_container">#1B1B21</color>
+    <color name="edeck_surface_container_high">#292A30</color>
+</resources>

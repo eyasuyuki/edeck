@@ -13,7 +13,7 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:theme="@style/Theme.EDeck">
         <activity
             android:name=".PlayerActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize"
