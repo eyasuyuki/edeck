@@ -70,7 +70,6 @@ class PlayerActivity : Activity() {
         playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
         player = builder.build().also { exo ->
             playerView.player = exo
-            // TV のスクリーンセーバー／スリープを再生中は抑止する。
             exo.addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     playerView.removeCallbacks(hideControllerRunnable)

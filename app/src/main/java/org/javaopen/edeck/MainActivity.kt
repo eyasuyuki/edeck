@@ -11,10 +11,13 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.FrameLayout
+import android.widget.BaseAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.ScrollView
+import android.widget.ListView
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import java.util.concurrent.Executors
@@ -22,12 +25,18 @@ import java.util.concurrent.Executors
 class MainActivity : ComponentActivity() {
     private val executor = Executors.newSingleThreadExecutor()
     private lateinit var status: TextView
-    private lateinit var videos: LinearLayout
+    private lateinit var videos: ListView
+    private lateinit var videoAdapter: VideoAdapter
     private lateinit var refreshButton: Button
     private lateinit var settingsButton: Button
+    private lateinit var startupBanner: View
     private val preferences by lazy { getSharedPreferences("playback", MODE_PRIVATE) }
     private var refreshVideos: (() -> List<RemoteVideo>)? = null
     private var currentVideos: List<RemoteVideo> = emptyList()
+    private var startupRestoreLoading = false
+    private val showStartupBannerRunnable = Runnable {
+        if (startupRestoreLoading) startupBanner.visibility = View.VISIBLE
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -92,13 +101,65 @@ class MainActivity : ComponentActivity() {
             setPadding(0, padding / 3, 0, padding / 3)
         }
         content.addView(status)
-        videos = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(ScrollView(this).apply { addView(videos) }, LinearLayout.LayoutParams(
+        videoAdapter = VideoAdapter()
+        videos = ListView(this).apply {
+            adapter = videoAdapter
+            isFocusable = true
+            isFocusableInTouchMode = true
+        }
+        content.addView(videos, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
         ))
         root.addView(content, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
-        setContentView(root)
+        startupBanner = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(padding * 2, padding * 2, padding * 2, padding * 2)
+            setBackgroundColor(android.graphics.Color.rgb(25, 31, 40))
+            visibility = View.GONE
+            addView(TextView(this@MainActivity).apply {
+                text = getString(R.string.app_name)
+                textSize = 42f
+                setTextColor(android.graphics.Color.WHITE)
+                gravity = Gravity.CENTER
+            })
+            addView(ProgressBar(this@MainActivity).apply {
+                isIndeterminate = true
+            }, LinearLayout.LayoutParams(dp(48), dp(48)).apply {
+                topMargin = padding
+                bottomMargin = padding
+                gravity = Gravity.CENTER_HORIZONTAL
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = getString(R.string.status_cache_loading)
+                textSize = 18f
+                setTextColor(android.graphics.Color.WHITE)
+                gravity = Gravity.CENTER
+            })
+        }
+        setContentView(FrameLayout(this).apply {
+            addView(root, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            ))
+            addView(startupBanner, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            ))
+        })
         refreshButton.requestFocus()
+    }
+
+    private fun beginStartupRestore() {
+        startupRestoreLoading = true
+        startupBanner.removeCallbacks(showStartupBannerRunnable)
+        startupBanner.postDelayed(showStartupBannerRunnable, STARTUP_BANNER_DELAY_MS)
+    }
+
+    private fun finishStartupRestore() {
+        startupRestoreLoading = false
+        startupBanner.removeCallbacks(showStartupBannerRunnable)
+        startupBanner.visibility = View.GONE
     }
 
     private fun menuButtonParams() = LinearLayout.LayoutParams(
@@ -306,11 +367,13 @@ class MainActivity : ComponentActivity() {
         }
         refreshVideos = cachingLoader
         status.text = loadingMessage
-        videos.removeAllViews()
+        videoAdapter.replaceItems(emptyList())
         executor.execute {
-            val result = runCatching(cachingLoader)
+            val result = runCatching {
+                cachingLoader().let { items -> items to sortVideos(items, selectedVideoSortOrder()) }
+            }
             runOnUiThread {
-                result.onSuccess(::showVideos).onFailure {
+                result.onSuccess { (items, sortedItems) -> showVideos(items, sortedItems) }.onFailure {
                     status.text = getString(R.string.error_load, it.localizedMessage ?: getString(R.string.network_error))
                 }
             }
@@ -318,37 +381,18 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showVideos(items: List<RemoteVideo>) {
+        showVideos(items, sortVideos(items, selectedVideoSortOrder()))
+    }
+
+    private fun showVideos(items: List<RemoteVideo>, sortedItems: List<RemoteVideo>) {
         currentVideos = items
-        videos.removeAllViews()
         if (items.isEmpty()) {
+            videoAdapter.replaceItems(emptyList())
             status.text = getString(R.string.status_no_videos)
             return
         }
         status.text = getString(R.string.status_videos_found, items.size)
-        sortVideos(items, selectedVideoSortOrder()).forEach { item ->
-            val watched = preferences.getBoolean("watched:${item.uri}", false)
-            val completed = preferences.getBoolean("completed:${item.uri}", false)
-            val button = Button(this).apply {
-                text = getString(
-                    when {
-                        completed -> R.string.video_mark_completed
-                        watched -> R.string.video_mark_watched
-                        else -> R.string.video_mark_unwatched
-                    },
-                    item.title
-                )
-                textSize = 18f
-                gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                setOnClickListener {
-                    startActivity(Intent(this@MainActivity, PlayerActivity::class.java).apply {
-                        putExtra(PlayerActivity.EXTRA_URI, item.uri.toString())
-                        putExtra(PlayerActivity.EXTRA_TITLE, item.title)
-                    })
-                }
-            }
-            styleRemoteButton(button)
-            videos.addView(button)
-        }
+        videoAdapter.replaceItems(sortedItems)
     }
 
     private fun sortVideos(items: List<RemoteVideo>, sortOrder: VideoSortOrder): List<RemoteVideo> {
@@ -375,13 +419,61 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val VIDEO_SORT_ORDER_KEY = "video_sort_order"
+        private const val STARTUP_BANNER_DELAY_MS = 250L
+    }
+
+    private inner class VideoAdapter : BaseAdapter() {
+        private var items: List<RemoteVideo> = emptyList()
+
+        fun replaceItems(newItems: List<RemoteVideo>) {
+            items = newItems
+            notifyDataSetChanged()
+        }
+
+        override fun getCount(): Int = items.size
+
+        override fun getItem(position: Int): RemoteVideo = items[position]
+
+        override fun getItemId(position: Int): Long = position.toLong()
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val item = getItem(position)
+            val button = (convertView as? Button) ?: Button(this@MainActivity).apply {
+                textSize = 18f
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                styleRemoteButton(this)
+            }
+            val watched = preferences.getBoolean("watched:${item.uri}", false)
+            val completed = preferences.getBoolean("completed:${item.uri}", false)
+            button.text = getString(
+                when {
+                    completed -> R.string.video_mark_completed
+                    watched -> R.string.video_mark_watched
+                    else -> R.string.video_mark_unwatched
+                },
+                item.title
+            )
+            button.setOnClickListener {
+                startActivity(Intent(this@MainActivity, PlayerActivity::class.java).apply {
+                    putExtra(PlayerActivity.EXTRA_URI, item.uri.toString())
+                    putExtra(PlayerActivity.EXTRA_TITLE, item.title)
+                })
+            }
+            return button
+        }
     }
 
     private fun restoreRecentSource() {
-        RecentSourceStore.load(this)?.let { activateSource(it, select = false) }
+        RecentSourceStore.load(this)?.let {
+            activateSource(it, select = false, isStartupRestore = true)
+        }
     }
 
-    private fun activateSource(source: RecentSource, select: Boolean = true) {
+    private fun activateSource(
+        source: RecentSource,
+        select: Boolean = true,
+        isStartupRestore: Boolean = false
+    ) {
         if (select) RecentSourceStore.select(this, source)
         val loader: (() -> List<RemoteVideo>)? = when (source) {
             is RecentSource.Smb -> SmbCredentialsStore.credentialsFor(this, source.address)?.let {
@@ -404,15 +496,21 @@ class MainActivity : ComponentActivity() {
             }
         }
         status.text = getString(R.string.status_cache_loading)
-        videos.removeAllViews()
+        videoAdapter.replaceItems(emptyList())
+        if (isStartupRestore) beginStartupRestore()
         executor.execute {
-            val cachedVideos = runCatching { VideoCacheStore.load(this, source.cacheKey) }.getOrNull()
+            val cachedVideos = runCatching {
+                VideoCacheStore.load(this, source.cacheKey)?.let { items ->
+                    items to sortVideos(items, selectedVideoSortOrder())
+                }
+            }.getOrNull()
             runOnUiThread {
                 when {
-                    cachedVideos != null -> showVideos(cachedVideos)
+                    cachedVideos != null -> showVideos(cachedVideos.first, cachedVideos.second)
                     loader == null -> status.text = getString(R.string.error_restore_source)
                     else -> status.text = getString(R.string.status_cache_empty)
                 }
+                if (isStartupRestore) finishStartupRestore()
             }
         }
     }
