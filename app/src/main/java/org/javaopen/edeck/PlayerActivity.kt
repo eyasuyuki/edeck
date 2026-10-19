@@ -73,7 +73,6 @@ class PlayerActivity : Activity() {
             // TV のスクリーンセーバー／スリープを再生中は抑止する。
             exo.addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    setKeepScreenOn(isPlaying)
                     playerView.removeCallbacks(hideControllerRunnable)
                     if (isPlaying) {
                         preferences.edit().putBoolean(watchedKey(), true).apply()
@@ -128,6 +127,11 @@ class PlayerActivity : Activity() {
         savePosition()
         player?.pause()
         super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        setKeepScreenOn(true)
     }
 
     override fun onStop() {
