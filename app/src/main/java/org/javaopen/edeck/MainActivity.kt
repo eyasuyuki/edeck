@@ -26,12 +26,19 @@ class MainActivity : ComponentActivity() {
     private lateinit var status: TextView
     private lateinit var videos: ListView
     private lateinit var videoAdapter: VideoAdapter
+    private lateinit var browserList: ListView
+    private lateinit var browserAdapter: BrowserAdapter
+    private lateinit var browserUpButton: Button
+    private lateinit var listButton: Button
+    private lateinit var browseButton: Button
     private lateinit var refreshButton: Button
     private lateinit var settingsButton: Button
     private lateinit var startupBanner: View
     private val preferences by lazy { getSharedPreferences("playback", MODE_PRIVATE) }
     private var refreshVideos: (() -> List<RemoteVideo>)? = null
     private var currentVideos: List<RemoteVideo> = emptyList()
+    private var browserSource: RecentSource? = null
+    private val browserPath = mutableListOf<String>()
     private var startupRestoreLoading = false
     private val showStartupBannerRunnable = Runnable {
         if (startupRestoreLoading) startupBanner.visibility = View.VISIBLE
@@ -47,6 +54,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         if (::videoAdapter.isInitialized) videoAdapter.refreshMarks()
+        if (::browserAdapter.isInitialized) browserAdapter.refreshMarks()
     }
 
     override fun onPause() {
@@ -76,6 +84,20 @@ class MainActivity : ComponentActivity() {
             setOnClickListener { refreshSource() }
         }
         styleRemoteButton(refreshButton)
+        listButton = Button(this).apply {
+            text = getString(R.string.action_video_list)
+            contentDescription = text
+            setOnClickListener { showVideoList() }
+        }
+        styleRemoteButton(listButton)
+        menu.addView(listButton, menuButtonParams())
+        browseButton = Button(this).apply {
+            text = getString(R.string.action_browse)
+            contentDescription = text
+            setOnClickListener { openBrowser() }
+        }
+        styleRemoteButton(browseButton)
+        menu.addView(browseButton, menuButtonParams())
         menu.addView(refreshButton, menuButtonParams())
         settingsButton = Button(this).apply {
             text = getString(R.string.action_settings)
@@ -101,6 +123,13 @@ class MainActivity : ComponentActivity() {
             setPadding(0, padding / 3, 0, padding / 3)
         }
         content.addView(status)
+        browserUpButton = Button(this).apply {
+            text = getString(R.string.action_parent_directory)
+            setOnClickListener { navigateBrowserUp() }
+            visibility = View.GONE
+        }
+        styleRemoteButton(browserUpButton)
+        content.addView(browserUpButton, menuButtonParams())
         videoAdapter = VideoAdapter()
         videos = ListView(this).apply {
             adapter = videoAdapter
@@ -110,6 +139,27 @@ class MainActivity : ComponentActivity() {
             setOnItemClickListener { _, _, position, _ -> playVideo(videoAdapter.getItem(position)) }
         }
         content.addView(videos, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+        ))
+        browserAdapter = BrowserAdapter()
+        browserList = ListView(this).apply {
+            adapter = browserAdapter
+            isFocusable = true
+            isFocusableInTouchMode = true
+            itemsCanFocus = false
+            visibility = View.GONE
+            setOnItemClickListener { _, _, position, _ ->
+                val item = browserAdapter.getItem(position)
+                when {
+                    item.directoryId != null -> {
+                        browserPath += item.directoryId
+                        loadBrowserDirectory(item.directoryId)
+                    }
+                    item.video != null -> playVideo(item.video)
+                }
+            }
+        }
+        content.addView(browserList, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
         ))
         root.addView(content, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
@@ -229,6 +279,72 @@ class MainActivity : ComponentActivity() {
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    private fun showVideoList() {
+        browserList.visibility = View.GONE
+        browserUpButton.visibility = View.GONE
+        videos.visibility = View.VISIBLE
+        status.text = getString(R.string.status_videos_found, currentVideos.size)
+        videos.requestFocus()
+    }
+
+    private fun openBrowser() {
+        val source = RecentSourceStore.load(this)
+        if (source == null) {
+            status.text = getString(R.string.status_open_source_first)
+            return
+        }
+        browserSource = source
+        browserPath.clear()
+        val root = when (source) {
+            is RecentSource.Smb -> source.address.let { if (it.endsWith('/')) it else "$it/" }
+            is RecentSource.Upnp -> "0"
+        }
+        browserPath += root
+        videos.visibility = View.GONE
+        browserList.visibility = View.VISIBLE
+        browserUpButton.visibility = View.VISIBLE
+        browserUpButton.isEnabled = false
+        loadBrowserDirectory(root)
+    }
+
+    private fun navigateBrowserUp() {
+        if (browserPath.size <= 1) return
+        browserPath.removeAt(browserPath.lastIndex)
+        browserUpButton.isEnabled = browserPath.size > 1
+        loadBrowserDirectory(browserPath.last())
+    }
+
+    private fun loadBrowserDirectory(directoryId: String) {
+        val source = browserSource ?: return
+        browserUpButton.isEnabled = browserPath.size > 1
+        status.text = getString(R.string.status_browsing)
+        browserAdapter.replaceItems(emptyList())
+        executor.execute {
+            val result = runCatching {
+                when (source) {
+                    is RecentSource.Smb -> {
+                        val credentials = SmbCredentialsStore.credentialsForResource(this, source.address)
+                            ?: error(getString(R.string.error_restore_source))
+                        val address = if (directoryId.startsWith("smb://", true)) directoryId else source.address
+                        SmbRepository.listDirectory(address, credentials.domain, credentials.username, credentials.password)
+                    }
+                    is RecentSource.Upnp -> UpnpRepository.browseDirectory(
+                        UpnpMediaServer(source.name, source.contentDirectoryUrl, source.contentDirectoryUrl, source.serviceType),
+                        directoryId
+                    )
+                }
+            }
+            runOnUiThread {
+                result.onSuccess { items ->
+                    browserAdapter.replaceItems(items)
+                    status.text = getString(R.string.status_browser_items, items.size)
+                }.onFailure {
+                    status.text = getString(R.string.error_load, it.localizedMessage ?: getString(R.string.network_error))
+                }
+            }
+        }
     }
 
     private fun discoverUpnpServers() {
@@ -450,18 +566,59 @@ class MainActivity : ComponentActivity() {
                 isFocusable = false
                 isClickable = false
             }
-            val watched = preferences.getBoolean("watched:${item.uri}", false)
-            val completed = preferences.getBoolean("completed:${item.uri}", false)
-            row.text = getString(
-                when {
-                    completed -> R.string.video_mark_completed
-                    watched -> R.string.video_mark_watched
-                    else -> R.string.video_mark_unwatched
-                },
-                item.title
-            )
+            row.text = videoLabel(item)
             return row
         }
+    }
+
+    private inner class BrowserAdapter : BaseAdapter() {
+        private var items: List<RemoteBrowserItem> = emptyList()
+
+        fun replaceItems(newItems: List<RemoteBrowserItem>) {
+            items = newItems
+            notifyDataSetChanged()
+        }
+
+        fun refreshMarks() = notifyDataSetChanged()
+        override fun getCount(): Int = items.size
+        override fun getItem(position: Int): RemoteBrowserItem = items[position]
+        override fun getItemId(position: Int): Long = position.toLong()
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val row = (convertView as? TextView) ?: TextView(this@MainActivity).apply {
+                textSize = 18f
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                setPadding(dp(16), dp(12), dp(16), dp(12))
+                minHeight = dp(56)
+                isFocusable = false
+                isClickable = false
+            }
+            val item = getItem(position)
+            row.text = item.directoryId?.let { getString(R.string.browser_folder, item.title) }
+                ?: item.video?.let(::videoLabel).orEmpty()
+            return row
+        }
+    }
+
+    private fun videoLabel(item: RemoteVideo): String {
+        val completed = preferences.getBoolean("completed:${item.uri}", false)
+        val position = preferences.getLong("position:${item.uri}", 0L)
+        val watched = preferences.getBoolean("watched:${item.uri}", false)
+        return when {
+            completed -> getString(R.string.video_mark_completed, item.title)
+            position > 0L -> getString(R.string.video_mark_position, item.title, formatPosition(position))
+            watched -> getString(R.string.video_mark_watched, item.title)
+            else -> getString(R.string.video_mark_unwatched, item.title)
+        }
+    }
+
+    private fun formatPosition(positionMs: Long): String {
+        val totalSeconds = positionMs / 1000
+        val seconds = totalSeconds % 60
+        val minutes = (totalSeconds / 60) % 60
+        val hours = totalSeconds / 3600
+        return if (hours > 0) "%d:%02d:%02d".format(hours, minutes, seconds)
+        else "%d:%02d".format(minutes, seconds)
     }
 
     private fun playVideo(item: RemoteVideo) {

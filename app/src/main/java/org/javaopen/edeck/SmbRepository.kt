@@ -37,6 +37,25 @@ object SmbRepository {
         return videos.sortedByDescending(RemoteVideo::lastModified)
     }
 
+    fun listDirectory(address: String, domain: String, username: String, password: String): List<RemoteBrowserItem> {
+        val normalized = address.trim().let { if (it.startsWith("smb://", true)) it else "smb://$it" }
+            .let { if (it.endsWith('/')) it else "$it/" }
+        val cifs = createContext(domain, username, password)
+        activeContext = cifs
+        val directory = SmbFile(normalized, cifs)
+        require(directory.exists() && directory.isDirectory) { "SMBフォルダーを開けません" }
+        return directory.listFiles().mapNotNull { file ->
+            when {
+                file.isDirectory -> RemoteBrowserItem(file.name.trimEnd('/'), directoryId = file.url.toString())
+                file.isFile && file.name.isSupportedVideo() -> RemoteBrowserItem(
+                    file.name,
+                    video = RemoteVideo(file.name, Uri.parse(file.url.toString()), file.lastModified())
+                )
+                else -> null
+            }
+        }.sortedWith(compareBy<RemoteBrowserItem> { it.directoryId == null }.thenBy { it.title.lowercase() })
+    }
+
     fun contextForPlayback(context: Context, address: String): CIFSContext {
         val saved = SmbCredentialsStore.credentialsForResource(context, address)
         return if (saved != null) createContext(saved.domain, saved.username, saved.password)

@@ -8,6 +8,12 @@
     <string name="action_search_upnp">UPnP/DLNAを検索</string>
     <string name="action_open_smb">SMB共有を開く</string>
     <string name="action_refresh">一覧を更新</string>
+    <string name="action_video_list">動画一覧</string>
+    <string name="action_browse">ブラウジング</string>
+    <string name="action_parent_directory">‹ ひとつ上のフォルダー</string>
+    <string name="status_browsing">フォルダーを読み込み中…</string>
+    <string name="status_browser_items">このフォルダー: %1$d 件</string>
+    <string name="browser_folder">▸  %1$s</string>
     <string name="status_choose_source">UPnPサーバーを検索するか、SMB共有のアドレスを入力してください</string>
     <string name="status_searching_upnp">LAN内のUPnP/DLNAサーバーを検索中…</string>
     <string name="status_no_upnp">UPnP/DLNAサーバーが見つかりません。同じLANに接続しているか確認してください。</string>
@@ -35,6 +41,7 @@
     <string name="video_mark_unwatched">▶  %1$s</string>
     <string name="video_mark_watched">✓  %1$s</string>
     <string name="video_mark_completed">★  %1$s</string>
+    <string name="video_mark_position">▶  %1$s  (%2$sから再生)</string>
     <string name="status_open_source_first">先にUPnPサーバーまたはSMB共有を開いてください</string>
     <string name="status_refreshing">一覧を更新中…</string>
     <string name="error_upnp_search">UPnP検索に失敗しました: %1$s</string>

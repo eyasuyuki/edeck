@@ -7,3 +7,9 @@ data class RemoteVideo(
     val uri: Uri,
     val lastModified: Long,
 )
+
+data class RemoteBrowserItem(
+    val title: String,
+    val directoryId: String? = null,
+    val video: RemoteVideo? = null,
+)

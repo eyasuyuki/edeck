@@ -150,6 +150,54 @@ object UpnpRepository {
         return videos.distinctBy { it.uri.toString() }.sortedByDescending(RemoteVideo::lastModified)
     }
 
+    fun browseDirectory(server: UpnpMediaServer, objectId: String): List<RemoteBrowserItem> {
+        val entries = mutableListOf<RemoteBrowserItem>()
+        var start = 0
+        var pageReturned: Int
+        var totalMatches: Int
+        do {
+            val page = browse(server, objectId, start)
+            val didl = page.didl
+            val containers = didl.getElementsByTagNameNS("*", "container")
+            for (index in 0 until containers.length) {
+                val container = containers.item(index) as? Element ?: continue
+                val id = container.getAttribute("id")
+                if (id.isNotBlank()) entries += RemoteBrowserItem(
+                    container.firstText("title").ifBlank { "フォルダー" }, directoryId = id
+                )
+            }
+            val items = didl.getElementsByTagNameNS("*", "item")
+            for (index in 0 until items.length) {
+                val item = items.item(index) as? Element ?: continue
+                val itemClass = item.firstText("class")
+                if (itemClass.isNotEmpty() && !itemClass.startsWith("object.item.videoItem")) continue
+                val video = item.toRemoteVideo() ?: continue
+                entries += RemoteBrowserItem(video.title, video = video)
+            }
+            pageReturned = page.numberReturned.takeIf { it > 0 } ?: (containers.length + items.length)
+            totalMatches = page.totalMatches.takeIf { it > 0 } ?: (start + pageReturned)
+            start += pageReturned
+        } while (pageReturned > 0 && start < totalMatches && start < MAX_RESULTS_PER_CONTAINER)
+        return entries.distinctBy { it.directoryId ?: it.video?.uri?.toString() }
+            .sortedWith(compareBy<RemoteBrowserItem> { it.directoryId == null }.thenBy { it.title.lowercase() })
+    }
+
+    private fun Element.toRemoteVideo(): RemoteVideo? {
+        val title = firstText("title").ifBlank { "動画" }
+        val date = firstText("date").toTimestamp()
+        val resources = getElementsByTagNameNS("*", "res")
+        for (index in 0 until resources.length) {
+            val resource = resources.item(index) as? Element ?: continue
+            val address = resource.textContent.trim()
+            val mime = resource.getAttribute("protocolInfo").split(':').getOrNull(2).orEmpty().lowercase()
+            if ((mime.startsWith("video/") || address.isVideoUrl()) &&
+                (address.startsWith("http://", true) || address.startsWith("https://", true))) {
+                return RemoteVideo(title, Uri.parse(address), date)
+            }
+        }
+        return null
+    }
+
     private fun readServer(descriptionUrl: URL): UpnpMediaServer {
         val document = httpGet(descriptionUrl)
         val baseAddress = document.getElementsByTagNameNS("*", "URLBase").item(0)?.textContent?.trim()
