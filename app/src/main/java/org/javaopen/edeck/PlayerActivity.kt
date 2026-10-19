@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -68,15 +69,18 @@ class PlayerActivity : Activity() {
         playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
         player = builder.build().also { exo ->
             playerView.player = exo
+            // TV のスクリーンセーバー／スリープを再生中は抑止する。
+            exo.addListener(object : Player.Listener {
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    setKeepScreenOn(isPlaying)
+                    if (isPlaying) preferences.edit().putBoolean(watchedKey(), true).apply()
+                }
+            })
             exo.setMediaItem(MediaItem.fromUri(Uri.parse(mediaUri)))
             exo.prepare()
             exo.seekTo(preferences.getLong(positionKey(), 0L))
             exo.playWhenReady = true
             exo.addListener(object : Player.Listener {
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    if (isPlaying) preferences.edit().putBoolean(watchedKey(), true).apply()
-                }
-
                 override fun onPlayerError(error: PlaybackException) {
                     Toast.makeText(
                         this@PlayerActivity,
@@ -100,6 +104,7 @@ class PlayerActivity : Activity() {
     }
 
     override fun onPause() {
+        setKeepScreenOn(false)
         savePosition()
         player?.pause()
         super.onPause()
@@ -111,6 +116,7 @@ class PlayerActivity : Activity() {
     }
 
     override fun onDestroy() {
+        setKeepScreenOn(false)
         savePosition()
         player?.release()
         player = null
@@ -123,6 +129,14 @@ class PlayerActivity : Activity() {
                 preferences.edit().putLong(positionKey(), exo.currentPosition).apply()
                 preferences.edit().putBoolean(watchedKey(), true).apply()
             }
+        }
+    }
+
+    private fun setKeepScreenOn(keepScreenOn: Boolean) {
+        if (keepScreenOn) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
     }
 
