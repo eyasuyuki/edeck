@@ -11,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.BaseAdapter
 import android.widget.Button
 import android.widget.EditText
@@ -29,9 +30,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var browserList: ListView
     private lateinit var browserAdapter: BrowserAdapter
     private lateinit var browserUpButton: Button
+    private lateinit var videoListHeader: View
     private lateinit var listButton: Button
     private lateinit var browseButton: Button
-    private lateinit var refreshButton: Button
+    private lateinit var refreshButton: ImageButton
     private lateinit var settingsButton: Button
     private lateinit var startupBanner: View
     private val preferences by lazy { getSharedPreferences("playback", MODE_PRIVATE) }
@@ -78,9 +80,11 @@ class MainActivity : ComponentActivity() {
             textSize = 26f
             setPadding(0, 0, 0, padding)
         })
-        refreshButton = Button(this).apply {
-            text = getString(R.string.action_refresh)
+        refreshButton = ImageButton(this).apply {
+            setImageResource(android.R.drawable.ic_popup_sync)
             contentDescription = getString(R.string.action_refresh)
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            backgroundTintList = ColorStateList.valueOf(android.graphics.Color.rgb(80, 80, 80))
             setOnClickListener { refreshSource() }
         }
         styleRemoteButton(refreshButton)
@@ -97,14 +101,13 @@ class MainActivity : ComponentActivity() {
             setOnClickListener { openBrowser() }
         }
         styleRemoteButton(browseButton)
-        menu.addView(browseButton, menuButtonParams())
-        menu.addView(refreshButton, menuButtonParams())
         settingsButton = Button(this).apply {
             text = getString(R.string.action_settings)
             contentDescription = getString(R.string.action_settings)
             setOnClickListener { showSettingsDialog() }
         }
         styleRemoteButton(settingsButton)
+        menu.addView(browseButton, menuButtonParams())
         menu.addView(settingsButton, menuButtonParams())
         root.addView(menu, LinearLayout.LayoutParams(dp(220), ViewGroup.LayoutParams.MATCH_PARENT))
 
@@ -138,6 +141,14 @@ class MainActivity : ComponentActivity() {
             itemsCanFocus = false
             setOnItemClickListener { _, _, position, _ -> playVideo(videoAdapter.getItem(position)) }
         }
+        videoListHeader = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END or Gravity.CENTER_VERTICAL
+            addView(refreshButton, LinearLayout.LayoutParams(dp(56), dp(48)))
+        }
+        content.addView(videoListHeader, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
         content.addView(videos, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
         ))
@@ -284,6 +295,8 @@ class MainActivity : ComponentActivity() {
     private fun showVideoList() {
         browserList.visibility = View.GONE
         browserUpButton.visibility = View.GONE
+        videoListHeader.visibility = View.VISIBLE
+        refreshButton.visibility = View.VISIBLE
         videos.visibility = View.VISIBLE
         status.text = getString(R.string.status_videos_found, currentVideos.size)
         videos.requestFocus()
@@ -303,6 +316,8 @@ class MainActivity : ComponentActivity() {
         }
         browserPath += root
         videos.visibility = View.GONE
+        videoListHeader.visibility = View.GONE
+        refreshButton.visibility = View.GONE
         browserList.visibility = View.VISIBLE
         browserUpButton.visibility = View.VISIBLE
         browserUpButton.isEnabled = false
@@ -321,6 +336,7 @@ class MainActivity : ComponentActivity() {
         browserUpButton.isEnabled = browserPath.size > 1
         status.text = getString(R.string.status_browsing)
         browserAdapter.replaceItems(emptyList())
+        browserList.requestFocus()
         executor.execute {
             val result = runCatching {
                 when (source) {
@@ -340,8 +356,11 @@ class MainActivity : ComponentActivity() {
                 result.onSuccess { items ->
                     browserAdapter.replaceItems(items)
                     status.text = getString(R.string.status_browser_items, items.size)
+                    browserList.requestFocus()
+                    if (items.isNotEmpty()) browserList.setSelection(0)
                 }.onFailure {
                     status.text = getString(R.string.error_load, it.localizedMessage ?: getString(R.string.network_error))
+                    browserList.requestFocus()
                 }
             }
         }
@@ -697,7 +716,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun styleRemoteButton(button: Button) {
+    private fun styleRemoteButton(button: View) {
         button.setOnFocusChangeListener { view, focused ->
             view.backgroundTintList = ColorStateList.valueOf(
                 if (focused) android.graphics.Color.rgb(21, 101, 192)
