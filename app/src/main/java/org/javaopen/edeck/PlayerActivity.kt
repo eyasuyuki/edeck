@@ -9,12 +9,14 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.ChannelMixingAudioProcessor
 import androidx.media3.common.audio.ChannelMixingMatrix
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -31,6 +33,7 @@ class PlayerActivity : Activity() {
     private val preferences by lazy { getSharedPreferences("playback", MODE_PRIVATE) }
     private lateinit var mediaUri: String
 
+    @OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Hide both system bars for TV playback; transient Android chrome otherwise
@@ -192,6 +195,7 @@ class PlayerActivity : Activity() {
     private fun watchedKey() = "watched:$mediaUri"
     private fun completedKey() = "completed:$mediaUri"
 
+    @OptIn(UnstableApi::class)
     @Suppress("DEPRECATION")
     private fun stereoRenderersFactory(): DefaultRenderersFactory {
         val downmix = ChannelMixingAudioProcessor().apply {

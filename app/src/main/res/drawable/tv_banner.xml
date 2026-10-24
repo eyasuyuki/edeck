@@ -1,0 +1,53 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+
+    <!-- 背景（ディープブルーのグラデーション） -->
+    <path
+        android:fillColor="#101B3D"
+        android:pathData="M0,0h320v180H0z"/>
+
+    <!-- 光のグラデーション演出（右上からの斜めグラデーション再現） -->
+    <path
+        android:fillColor="#344FA8"
+        android:fillAlpha="0.45"
+        android:pathData="M120,0h200v180H220z"/>
+
+    <path
+        android:fillColor="#607EFF"
+        android:fillAlpha="0.25"
+        android:pathData="M200,0h120v120z"/>
+
+    <!-- 元のSVGにあった正しさのまま縮小・配置した「E」ロゴマーク (145,119〜352,385のパスを縮小) -->
+    <path
+        android:fillColor="#F6F8FF"
+        android:pathData="M40,50h58v18H61v14h27v17H61v14h37v18H40z"/>
+
+    <!-- 「E」の右側に続く「Deck」のテキスト表現（パス描画） -->
+    <!-- D -->
+    <path
+        android:fillColor="#F6F8FF"
+        android:pathData="M110,50h20c12,0 18,6 18,18v25c0,12 -6,18 -18,18h-20V50zm16,16v33h5c4,0 7,-2 7,-7V73c0,-5 -3,-7 -7,-7h-5z"/>
+
+    <!-- e -->
+    <path
+        android:fillColor="#F6F8FF"
+        android:pathData="M168,70c0,-7 5,-12 14,-12s14,5 14,12v2c0,1 0,2 -1,2h-20c0,5 3,7 7,7c3,0 6,-1 7,-3h8c-2,6 -7,9 -15,9c-9,0 -14,-5 -14,-14zm14,-6c-3,0 -6,2 -6,5h12c0,-3 -3,-5 -6,-5z"/>
+
+    <!-- c -->
+    <path
+        android:fillColor="#F6F8FF"
+        android:pathData="M202,70c0,-9 6,-14 14,-14c7,0 12,4 13,10h-8c-1,-2 -3,-4 -5,-4c-4,0 -6,3 -6,8s2,8 6,8c2,0 4,-2 5,-4h8c-1,6 -6,10 -13,10c-8,0 -14,-5 -14,-14z"/>
+
+    <!-- k -->
+    <path
+        android:fillColor="#F6F8FF"
+        android:pathData="M236,50h8v16l10,-10h10l-12,11l13,14h-10l-9,-10l-2,2v8h-8V50z"/>
+
+    <!-- 元のSVGと同じアクセントカラーの再生（▶）記号 -->
+    <path
+        android:fillColor="#51E0D0"
+        android:pathData="M272,75l20,11l-20,11z"/>
+</vector>
